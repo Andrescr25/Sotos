@@ -1,0 +1,74 @@
+{
+  "name": "sotos",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@react-native-vector-icons/ionicons": "^13.1.5",
+    "expo": "~57.0.28",
+    "expo-constants": "~57.0.21",
+    "expo-font": "~57.0.4",
+    "expo-linking": "~57.0.12",
+    "expo-router": "~57.0.26",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "server:install": "npm install --prefix server",
+    "server:dev": "npm run dev --prefix server"
+  },
+  "private": true,
+  "devDependencies": {
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.6"
+  },
+  "jest": {
+    "projects": [
+      {
+        "displayName": "app",
+        "preset": "jest-expo",
+        "moduleNameMapper": {
+          "^@/(.*)$": "<rootDir>/src/$1"
+        },
+        "testPathIgnorePatterns": [
+          "/node_modules/",
+          "/.expo/",
+          "<rootDir>/server/"
+        ]
+      },
+      {
+        "displayName": "server",
+        "rootDir": "server",
+        "testEnvironment": "node",
+        "moduleNameMapper": {
+          "^@/(.*)$": "<rootDir>/../src/$1"
+        },
+        "transform": {
+          "\\.js$": [
+            "babel-jest",
+            {
+              "configFile": false,
+              "babelrc": false,
+              "plugins": [
+                "@babel/plugin-transform-modules-commonjs"
+              ]
+            }
+          ]
+        },
+        "testPathIgnorePatterns": [
+          "/node_modules/",
+          "/dist/"
+        ]
+      }
+    ]
+  }
+}

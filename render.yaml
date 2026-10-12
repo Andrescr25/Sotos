@@ -1,0 +1,39 @@
+# Blueprint de Render: crea el servidor y la base de datos de una sola vez.
+# Guía paso a paso: docs/DESPLIEGUE_RENDER.md
+#
+# IMPORTANTE: los planes "free" NO sirven para un restaurante real:
+#   - El servicio gratuito se duerme tras 15 min sin tráfico (el primer pedido
+#     tardaría ~1 minuto en llegar a cocina).
+#   - La base de datos gratuita expira a los 30 días y luego se borra.
+# Por eso aquí se usan planes de pago. Revisa precios en https://render.com/pricing
+
+services:
+  - type: web
+    name: sotos-server
+    runtime: node
+    region: oregon # elige la región más cercana a tu restaurante; debe ser la misma que la base de datos
+    plan: 0.5c-512mb
+    buildCommand: npm ci --prefix server && npm run build --prefix server
+    startCommand: node server/dist/index.js
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: BUSINESS_TZ
+        value: America/Costa_Rica
+      - key: API_KEY
+        generateValue: true # Render genera una clave; cópiala a EXPO_PUBLIC_API_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sotos-db
+          property: connectionString
+
+databases:
+  - name: sotos-db
+    plan: 0.1c-256mb
+    region: oregon
+    databaseName: sotos
+    user: sotos
