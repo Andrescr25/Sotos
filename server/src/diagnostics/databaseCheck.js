@@ -3,7 +3,7 @@
  * contraseña: solo datos que se pueden compartir sin riesgo.
  */
 
-const TABLES = ['orders', 'order_counters', 'users', 'sessions'];
+const TABLES = ['orders', 'order_counters', 'users', 'sessions', 'invitations', 'menu_documents'];
 
 /**
  * Resume una DATABASE_URL sin exponer la contraseña.

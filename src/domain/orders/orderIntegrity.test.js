@@ -11,6 +11,7 @@ import {
   createDraftOrder,
   createOrderItem,
   sendOrderToKitchen,
+  setCustomerName,
 } from '@/domain/orders';
 
 const [cashier, cook] = usersSeed;
@@ -19,7 +20,7 @@ const at = (minutes) => new Date(T0.getTime() + minutes * 60_000);
 
 function sentOrder() {
   const draft = addItem(
-    createDraftOrder({ createdBy: cashier, now: T0 }),
+    setCustomerName(createDraftOrder({ createdBy: cashier, now: T0 }), 'María Pérez', T0),
     createOrderItem({ product: findProduct(menuSeed, 'prod-papas'), quantity: 2 }),
     T0,
   );
@@ -71,6 +72,16 @@ describe('checkOrderActor', () => {
 describe('checkOrderWrite — creación', () => {
   it('acepta un pedido recién enviado a cocina', () => {
     expect(checkOrderWrite(null, sentOrder())).toEqual({ ok: true });
+  });
+
+  it('rechaza un pedido sin nombre de cliente', () => {
+    const order = sentOrder();
+    expect(codeOf(checkOrderWrite(null, { ...order, customerName: '' }))).toBe(ORDER_ERROR.CUSTOMER_NAME_REQUIRED);
+    expect(codeOf(checkOrderWrite(null, { ...order, customerName: '...' }))).toBe(
+      ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+    );
+    const { customerName, ...withoutField } = order; // un cliente de una versión vieja de la app
+    expect(codeOf(checkOrderWrite(null, withoutField))).toBe(ORDER_ERROR.CUSTOMER_NAME_REQUIRED);
   });
 
   it('rechaza guardar un borrador como pedido nuevo', () => {
@@ -125,6 +136,14 @@ describe('checkOrderWrite — actualización', () => {
     const next = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
 
     expect(checkOrderWrite(storedLikeJsonb, next)).toEqual({ ok: true });
+  });
+
+  it('rechaza cambiar el nombre del cliente de un pedido ya enviado', () => {
+    const existing = sentOrder();
+    const next = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
+    expect(codeOf(checkOrderWrite(existing, { ...next, customerName: 'Otra persona' }))).toBe(
+      ORDER_ERROR.INVALID_ORDER,
+    );
   });
 
   it('rechaza cambiar las líneas de un pedido ya enviado', () => {

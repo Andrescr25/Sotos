@@ -17,7 +17,7 @@ export function createHttpClient({ baseUrl, session, fetchImpl = globalThis.fetc
    * @param {string} method
    * @param {string} path
    * @param {{ body?: unknown, authenticated?: boolean }} [options]
-   *   `authenticated: false` para login y registro: un 401 ahí significa
+   *   `authenticated: false` para login e invitaciones: un 401 ahí significa
    *   "credenciales incorrectas", no "sesión vencida".
    */
   async function request(method, path, { body, authenticated = true } = {}) {
@@ -55,5 +55,6 @@ export function createHttpClient({ baseUrl, session, fetchImpl = globalThis.fetc
     post: (path, body, options) => request('POST', path, { ...options, body }),
     put: (path, body, options) => request('PUT', path, { ...options, body }),
     patch: (path, body, options) => request('PATCH', path, { ...options, body }),
+    delete: (path, options) => request('DELETE', path, options),
   };
 }

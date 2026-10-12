@@ -46,6 +46,7 @@ export function loadConfig(env = process.env) {
       .map((origin) => origin.trim())
       .filter(Boolean),
     sessionTtlDays: Number(env.SESSION_TTL_DAYS) || 30,
+    inviteTtlDays: Number(env.INVITE_TTL_DAYS) || 7,
     admin: {
       username: cleanEnvValue(env.ADMIN_USERNAME) || null,
       // La contraseña se toma tal cual: podría llevar espacios o comillas a propósito.

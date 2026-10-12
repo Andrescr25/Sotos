@@ -1,5 +1,6 @@
 import { PERMISSIONS, can } from '@/domain/users/permissions';
 import { deepEqual } from '@/shared/utils/deepEqual';
+import { isValidCustomerName } from './customerName';
 import { ORDER_ERROR } from './orderErrors';
 import { ORDER_STATUS, getTransitionPermission } from './orderStatus';
 import { calculateOrderTotals } from './pricing';
@@ -45,7 +46,8 @@ export function checkOrderActor(existing, incoming, user) {
  *
  * - Un pedido llega al almacenamiento ya enviado a cocina (estado "new").
  * - Después solo puede avanzar por transiciones válidas, de una en una.
- * - Las líneas, el número y quién lo tomó no cambian una vez guardado.
+ * - Debe llevar el nombre del cliente.
+ * - Las líneas, el número, el cliente y quién lo tomó no cambian una vez guardado.
  * - `existing` es lo que hay guardado (o null) leído dentro de la misma
  *   transacción que la escritura: así se detectan escrituras concurrentes.
  *
@@ -98,6 +100,9 @@ export function checkOrderWrite(existing, incoming) {
     if (incoming.items.length === 0) {
       return fail(ORDER_ERROR.EMPTY_ORDER, 'El pedido no tiene productos');
     }
+    if (!isValidCustomerName(incoming.customerName)) {
+      return fail(ORDER_ERROR.CUSTOMER_NAME_REQUIRED, 'El pedido debe llevar el nombre del cliente');
+    }
     return { ok: true };
   }
 
@@ -129,6 +134,7 @@ export function checkOrderWrite(existing, incoming) {
     incoming.type === existing.type &&
     incoming.tableId === existing.tableId &&
     incoming.note === existing.note &&
+    incoming.customerName === existing.customerName &&
     incoming.createdAt === existing.createdAt &&
     incoming.createdBy?.id === existing.createdBy.id &&
     deepEqual(incoming.items, existing.items);

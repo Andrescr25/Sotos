@@ -1,4 +1,5 @@
 import { ORDER_ERROR } from '@/domain/orders';
+import { MENU_ERROR } from '@/domain/menu';
 import { USER_ERROR } from '@/domain/users';
 import { AppError, COMMON_ERROR } from '@/shared/errors/AppError';
 
@@ -24,11 +25,23 @@ export function statusForCode(code) {
       return 403;
     case ORDER_ERROR.ORDER_NOT_FOUND:
     case USER_ERROR.USER_NOT_FOUND:
+    case MENU_ERROR.CATEGORY_NOT_FOUND:
+    case MENU_ERROR.PRODUCT_NOT_FOUND:
+    case MENU_ERROR.EXTRA_NOT_FOUND:
+    case MENU_ERROR.NOTE_NOT_FOUND:
+    case USER_ERROR.INVITATION_INVALID:
       return 404;
+    case USER_ERROR.INVITATION_USED:
+    case USER_ERROR.INVITATION_EXPIRED:
+      return 410;
     case ORDER_ERROR.INVALID_TRANSITION:
     case ORDER_ERROR.CONFLICT:
     case USER_ERROR.USERNAME_TAKEN:
     case USER_ERROR.LAST_ADMIN:
+    case MENU_ERROR.DUPLICATE_NAME:
+    case MENU_ERROR.DUPLICATE_NOTE:
+    case MENU_ERROR.CATEGORY_NOT_EMPTY:
+    case MENU_ERROR.MENU_NOT_EMPTY:
       return 409;
     case COMMON_ERROR.RATE_LIMITED:
       return 429;

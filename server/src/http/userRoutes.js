@@ -22,6 +22,33 @@ export function createUserRoutes({ authService, hub }) {
     },
 
     {
+      // El administrador crea la cuenta de un empleado y recibe su enlace.
+      method: 'POST',
+      pattern: /^\/users$/,
+      async handler({ req, user }) {
+        requirePermission(user, PERMISSIONS.USER_MANAGE);
+        const body = (await readJson(req)) ?? {};
+        const created = await authService.createAccount(body, user.id);
+
+        hub.notifyUsersChanged();
+        return { status: 201, body: created };
+      },
+    },
+
+    {
+      // Enlace nuevo para una cuenta existente: invitación perdida o contraseña olvidada.
+      method: 'POST',
+      pattern: /^\/users\/([^/]+)\/invitation$/,
+      async handler({ params, user }) {
+        requirePermission(user, PERMISSIONS.USER_MANAGE);
+        const created = await authService.createInvitation(params[0], user.id);
+
+        hub.notifyUsersChanged();
+        return { status: 201, body: created };
+      },
+    },
+
+    {
       method: 'PATCH',
       pattern: /^\/users\/([^/]+)$/,
       async handler({ req, params, user }) {

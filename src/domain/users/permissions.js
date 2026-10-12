@@ -14,12 +14,17 @@ export const PERMISSIONS = Object.freeze({
   ORDER_DELIVER: 'order:deliver',
   ORDER_CANCEL: 'order:cancel',
   KITCHEN_VIEW: 'kitchen:view',
+  /** Leer el menú (caja lo necesita para tomar pedidos). */
+  MENU_VIEW: 'menu:view',
+  /** Agregar, editar y eliminar platillos, bebidas, extras y categorías. */
+  MENU_MANAGE: 'menu:manage',
   /** Ver usuarios y asignarles rol / habilitarlos. */
   USER_MANAGE: 'user:manage',
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
   [ROLES.CASHIER]: [
+    PERMISSIONS.MENU_VIEW,
     PERMISSIONS.ORDER_VIEW,
     PERMISSIONS.ORDER_CREATE,
     PERMISSIONS.ORDER_SEND,

@@ -140,16 +140,50 @@ esta variable, o Expo reutiliza la caché). Se abre en el navegador
 > `EXPO_PUBLIC_*` se incrusta en la app al compilarla. Si cambias la URL hay
 > que volver a compilar (en Render: un nuevo despliegue de `sotos-app`).
 
+## El menú empieza vacío
+
+La base de datos de producción **no trae productos**: el administrador arma el
+menú desde **Administración → Menú** (platillos, bebidas, extras, categorías y
+observaciones frecuentes). Caja lo recibe en vivo.
+
+Para arrancar rápido hay un botón **“Cargar menú de ejemplo”** (solo funciona
+con el menú vacío) que crea unas hamburguesas, acompañamientos y bebidas que
+luego se editan o eliminan.
+
+Cambiar o eliminar productos **no altera pedidos ya tomados**: cada pedido
+guarda su propia copia del nombre y el precio.
+
 ## Cómo se da acceso al personal
 
-El personal **no elige su rol**. El flujo es:
+El personal **no elige su rol** y **no existe el registro abierto**: nadie puede
+crearse una cuenta solo. Todas las cuentas las crea el administrador.
 
-1. La persona abre la app y toca **Crear cuenta** (nombre, usuario y contraseña).
-2. Queda en **“Acceso pendiente”**: no puede ver pedidos ni nada más.
-3. El administrador entra a **Usuarios y accesos**, ve la cuenta nueva (aparece
-   arriba y resaltada) y le asigna **Cajero**, **Cocinero** o **Administrador**.
-4. La pantalla de la persona cambia sola, sin volver a iniciar sesión, y la lleva
-   a su zona.
+### Invitar a un empleado
+
+1. **Administración → Usuarios y accesos → Invitar empleado.**
+2. Escribe el **nombre** (el usuario se sugiere solo, p. ej. `maria.perez`) y
+   elige el **acceso**: Cajero, Cocinero, Administrador o "Sin acceso todavía".
+3. Pulsa **Crear cuenta y generar enlace**. Aparece el enlace:
+   **Copiar enlace** o **Enviar por WhatsApp** (se abre con el mensaje escrito).
+4. El empleado abre el enlace en su tablet o teléfono, **crea su contraseña** y
+   entra directo a su zona. No tiene que elegir nada.
+
+El enlace sirve **una sola vez** y vence a los 7 días. Solo se muestra al
+crearlo: si se pierde o venció, en la lista pulsa **Nuevo enlace de …**.
+
+> El enlace lleva la dirección de la app web desde la que lo generas. Genéralo
+> desde `https://sotos-app.onrender.com` (no desde `localhost`) para que el
+> empleado pueda abrirlo.
+
+Si al invitar elegiste **“Sin acceso todavía”**, el empleado entra pero ve
+**“Acceso pendiente”**; en **Usuarios y accesos** aparece resaltado y, al
+asignarle **Cajero**, **Cocinero** o **Administrador**, su pantalla cambia sola.
+
+### Contraseña olvidada
+
+En **Usuarios y accesos**, pulsa **Restablecer contraseña de …**: se genera un
+enlace como el de invitación. Al usarlo, la persona crea una contraseña nueva y
+sus sesiones anteriores se cierran en todos sus dispositivos.
 
 El administrador también puede quitar el acceso (“Sin acceso”) o deshabilitar la
 cuenta: se cierra su sesión al instante. Siempre debe quedar al menos un
@@ -203,6 +237,7 @@ disabled" para estas tablas.
 | `DATABASE_SSL_CA` | no | Certificado raíz de Supabase (PEM) para **verificar** al servidor |
 | `DATABASE_SSL` | no | `true`/`false`. Por defecto activo salvo en localhost |
 | `SESSION_TTL_DAYS` | no | Duración de una sesión (30) |
+| `INVITE_TTL_DAYS` | no | Vigencia de un enlace de invitación (7) |
 | `CORS_ORIGIN` | no | Orígenes web extra permitidos (coma) o `*`. `localhost` siempre se permite |
 
 La conexión siempre va **cifrada**. Sin `DATABASE_SSL_CA` no se verifica la
@@ -248,9 +283,12 @@ ejemplo.
   limitador de intentos de login también es por proceso.
 - **Dos servicios, dos facturas.** Si Supabase pausa el proyecto (plan gratuito)
   o hay una caída, el servidor responde con errores aunque Render esté activo.
-- **Sin recuperación de contraseña.** Si alguien la olvida, hoy el administrador
-  debe deshabilitar la cuenta y la persona crear otra. Falta “restablecer
-  contraseña” desde administración.
+- **Cada cual no puede cambiar su propia contraseña desde la app:** si quiere
+  otra, el administrador le genera un enlace.
+- **Los enlaces de invitación viajan por chat** (WhatsApp, etc.). Quien lo
+  intercepte antes que el empleado podría crear la contraseña: por eso sirven
+  una sola vez, vencen y se pueden reemplazar. Envíalos solo al empleado y
+  confirma que entró.
 - **Respaldos.** Los gestiona Supabase según tu plan; en el gratuito no hay
   copias descargables. Para datos que importen, usa un plan de pago o exporta
   periódicamente.

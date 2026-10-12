@@ -3,7 +3,7 @@ import { commonStyles } from '@/shared/styles/commonStyles';
 import { theme } from '@/shared/theme';
 import { Icon, Screen, Text } from '@/shared/ui';
 
-/** Marco común de las pantallas de acceso (login, registro, acceso pendiente). */
+/** Marco común de las pantallas de acceso (login, invitación, acceso pendiente). */
 export function AuthCard({ icon = 'restaurant', title, subtitle, children }) {
   return (
     <Screen>

@@ -11,6 +11,11 @@ export const USER_ERROR = Object.freeze({
   INVALID_ROLE: 'invalid_role',
   /** Quitarle el acceso al único administrador activo dejaría el sistema sin gestión. */
   LAST_ADMIN: 'last_admin',
+  /** El enlace de invitación no existe (mal copiado o reemplazado por uno nuevo). */
+  INVITATION_INVALID: 'invitation_invalid',
+  INVITATION_EXPIRED: 'invitation_expired',
+  /** El enlace ya se usó: cada invitación sirve una sola vez. */
+  INVITATION_USED: 'invitation_used',
   FORBIDDEN: COMMON_ERROR.FORBIDDEN,
   UNAUTHORIZED: COMMON_ERROR.UNAUTHORIZED,
   NETWORK: COMMON_ERROR.NETWORK,

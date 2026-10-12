@@ -1,5 +1,3 @@
-import { validateRegistration } from '@/domain/users';
-
 /**
  * Repositorios remotos de sesión y de usuarios.
  *
@@ -23,13 +21,6 @@ export function createRemoteAccountRepositories({ http, realtime, session }) {
         if (error.code === 'network') throw error;
         return null;
       }
-    },
-
-    async register(input) {
-      const data = validateRegistration(input);
-      const payload = await http.post('/auth/register', data, { authenticated: false });
-      await session.set(payload.token);
-      return payload.user;
     },
 
     async login({ username, password }) {
@@ -56,6 +47,21 @@ export function createRemoteAccountRepositories({ http, realtime, session }) {
       return payload.user;
     },
 
+    async getInvitation(token) {
+      const payload = await http.post('/invitations/lookup', { token }, { authenticated: false });
+      return payload.invitation;
+    },
+
+    async acceptInvitation(token, password) {
+      const payload = await http.post(
+        '/invitations/accept',
+        { token, password },
+        { authenticated: false },
+      );
+      await session.set(payload.token);
+      return payload.user;
+    },
+
     subscribe(listener) {
       const stopRealtime = realtime.subscribe((event) => {
         if (event.type === 'user:updated' || event.type === 'connection') listener(event);
@@ -77,6 +83,16 @@ export function createRemoteAccountRepositories({ http, realtime, session }) {
     async setAccess(id, changes) {
       const payload = await http.patch(`/users/${encodeURIComponent(id)}`, changes);
       return payload.user;
+    },
+
+    async createAccount(input) {
+      const { user, invitation } = await http.post('/users', input);
+      return { user, invitation };
+    },
+
+    async createInvitation(userId) {
+      const { user, invitation } = await http.post(`/users/${encodeURIComponent(userId)}/invitation`);
+      return { user, invitation };
     },
 
     subscribe(listener) {

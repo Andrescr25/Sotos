@@ -85,10 +85,10 @@ export const menuSeed = {
     },
   ],
   extras: [
-    { id: 'extra-queso', name: 'Queso extra', price: 500, active: true },
-    { id: 'extra-tocino', name: 'Tocino', price: 700, active: true },
-    { id: 'extra-huevo', name: 'Huevo', price: 400, active: true },
-    { id: 'extra-salsa', name: 'Salsa extra', price: 300, active: true },
+    { id: 'extra-queso', name: 'Queso extra', price: 500, sortOrder: 1, active: true },
+    { id: 'extra-tocino', name: 'Tocino', price: 700, sortOrder: 2, active: true },
+    { id: 'extra-huevo', name: 'Huevo', price: 400, sortOrder: 3, active: true },
+    { id: 'extra-salsa', name: 'Salsa extra', price: 300, sortOrder: 4, active: true },
   ],
   quickNotes: [
     'Sin cebolla',

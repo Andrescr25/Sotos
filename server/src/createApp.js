@@ -5,6 +5,7 @@ import { createAuthRoutes } from './http/authRoutes';
 import { resolveCorsOrigin } from './http/cors';
 import { createRateLimiter } from './http/createRateLimiter';
 import { HttpError, getBearerToken, sendJson, statusForCode } from './http/httpUtils';
+import { createMenuRoutes } from './http/menuRoutes';
 import { createOrderRoutes } from './http/orderRoutes';
 import { createUserRoutes } from './http/userRoutes';
 import { createRealtimeHub } from './realtime/createRealtimeHub';
@@ -19,14 +20,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @param {Object} deps
  * @param {import('./store/contracts').OrderStore} deps.orderStore
  * @param {import('./store/contracts').UserStore} deps.userStore
- * @param {{ timeZone: string, sessionTtlDays?: number, corsOrigins?: string[], loginRateLimit?: { max: number, windowMs: number } }} deps.config
+ * @param {import('./store/contracts').MenuStore} deps.menuStore
+ * @param {{ timeZone: string, sessionTtlDays?: number, inviteTtlDays?: number, corsOrigins?: string[], loginRateLimit?: { max: number, windowMs: number } }} deps.config
  * @param {() => Date} [deps.now]
  * @param {number} [deps.heartbeatMs]
  */
-export function createApp({ orderStore, userStore, config, now = () => new Date(), heartbeatMs }) {
+export function createApp({ orderStore, userStore, menuStore, config, now = () => new Date(), heartbeatMs }) {
   const authService = createAuthService({
     userStore,
     sessionTtlMs: (config.sessionTtlDays ?? 30) * DAY_MS,
+    inviteTtlMs: (config.inviteTtlDays ?? 7) * DAY_MS,
     now,
   });
   const hub = createRealtimeHub({
@@ -38,6 +41,7 @@ export function createApp({ orderStore, userStore, config, now = () => new Date(
   const routes = [
     ...createAuthRoutes({ authService, rateLimiter, hub }),
     ...createUserRoutes({ authService, hub }),
+    ...createMenuRoutes({ menuStore, hub }),
     ...createOrderRoutes({ orderStore, hub, timeZone: config.timeZone, now }),
   ];
 
@@ -52,7 +56,7 @@ export function createApp({ orderStore, userStore, config, now = () => new Date(
     res.setHeader('Access-Control-Allow-Origin', allowOrigin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Max-Age', '600');
     return true;
   }

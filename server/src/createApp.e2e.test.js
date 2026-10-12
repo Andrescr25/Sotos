@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { createHttpClient } from '@/data/remote/createHttpClient';
 import { createRealtimeClient } from '@/data/remote/createRealtimeClient';
 import { createRemoteAccountRepositories } from '@/data/remote/createRemoteAccountRepositories';
+import { createRemoteMenuRepository } from '@/data/remote/createRemoteMenuRepository';
 import { createRemoteOrderRepository } from '@/data/remote/createRemoteOrderRepository';
 import { createMemoryTokenStorage } from '@/data/session/createMemoryTokenStorage';
 import { createSessionStore } from '@/data/session/createSessionStore';
@@ -14,16 +15,20 @@ import {
   changeOrderStatus,
   createDraftOrder,
   createOrderItem,
+  sendOrderToKitchen,
+  setCustomerName,
 } from '@/domain/orders';
+import { MENU_ERROR } from '@/domain/menu';
 import { ROLES, USER_ERROR } from '@/domain/users';
 import { createOrderService } from '@/services/orderService';
 import { createApp } from './createApp';
+import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
 
-function draftFor(user) {
+function draftFor(user, customerName = 'María Pérez') {
   return addItem(
-    createDraftOrder({ createdBy: user }),
+    setCustomerName(createDraftOrder({ createdBy: user }), customerName),
     createOrderItem({ product: findProduct(menuSeed, 'prod-hamburguesa-clasica'), quantity: 2 }),
   );
 }
@@ -40,6 +45,7 @@ async function waitFor(check, description, timeoutMs = 4000) {
 describe('servidor de pedidos (HTTP + WebSocket)', () => {
   let orderStore;
   let userStore;
+  let menuStore;
   let app;
   let port;
   let baseUrl;
@@ -49,6 +55,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     app = createApp({
       orderStore,
       userStore,
+      menuStore,
       config: { timeZone: 'America/Costa_Rica', loginRateLimit },
       heartbeatMs: 200,
     });
@@ -69,11 +76,13 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     });
     const accounts = createRemoteAccountRepositories({ http, realtime, session });
     const orderRepository = createRemoteOrderRepository({ http, realtime });
+    const menuRepository = createRemoteMenuRepository({ http, realtime });
     return {
       session,
       http,
       ...accounts,
       orderRepository,
+      menuRepository,
       orderService: createOrderService({ orderRepository }),
     };
   }
@@ -88,17 +97,23 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
   const isConnected = (events) =>
     events.filter((event) => event.type === 'connection').at(-1)?.connected === true;
 
-  /** Registra una cuenta nueva (queda sin rol) en una tablet nueva. */
-  async function registerStaff(username, name = username) {
-    const device = tablet();
-    const user = await device.authRepository.register({ name, username, password: 'secreta1' });
-    return { device, user };
-  }
-
   /** Tablet del administrador inicial, con sesión iniciada. */
   async function adminTablet() {
     const device = tablet();
     const user = await device.authRepository.login({ username: 'admin', password: 'admin123' });
+    return { device, user };
+  }
+
+  /**
+   * Da de alta a una persona como en la vida real: el administrador crea la
+   * cuenta (sin rol, o con el indicado) y la persona crea su contraseña
+   * ('secreta1') con el enlace, en su propia tablet.
+   */
+  async function registerStaff(username, name = username, role = null) {
+    const admin = await adminTablet();
+    const { invitation } = await admin.device.userRepository.createAccount({ name, username, role });
+    const device = tablet();
+    const user = await device.authRepository.acceptInvitation(invitation.token, 'secreta1');
     return { device, user };
   }
 
@@ -113,6 +128,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
   beforeEach(async () => {
     orderStore = createMemoryStore();
     userStore = createMemoryUserStore();
+    menuStore = createMemoryMenuStore();
     await startApp();
     await app.authService.ensureAdmin({ username: 'admin', password: 'admin123', name: 'Administrador' });
   });
@@ -147,6 +163,10 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       expect(local.status).toBe(204);
       expect(local.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
       expect(local.headers.get('access-control-allow-headers')).toMatch(/Authorization/);
+      // El navegador exige que el método esté permitido: la app usa todos estos.
+      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].forEach((method) =>
+        expect(local.headers.get('access-control-allow-methods')).toContain(method),
+      );
 
       const foreign = await preflight('https://sitio-malicioso.example');
       expect(foreign.status).toBe(404);
@@ -168,7 +188,20 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       expect(await response.json()).toMatchObject({ service: 'sotos-server', status: 'ok' });
     });
 
-    it('quien se registra queda SIN rol y no puede ver pedidos ni usuarios', async () => {
+    it('no existe el registro abierto: crear una cuenta propia no es posible', async () => {
+      const response = await fetch(`${baseUrl}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Intruso', username: 'intruso', password: 'secreta1' }),
+      });
+      expect(response.status).toBe(404);
+
+      await expect(
+        tablet().authRepository.login({ username: 'intruso', password: 'secreta1' }),
+      ).rejects.toMatchObject({ code: USER_ERROR.INVALID_CREDENTIALS });
+    });
+
+    it('una cuenta invitada sin rol queda SIN acceso: no ve pedidos ni usuarios', async () => {
       const { device, user } = await registerStaff('maria', 'María Pérez');
 
       expect(user).toMatchObject({ name: 'María Pérez', role: null, active: true });
@@ -183,8 +216,9 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       await expect(
         other.authRepository.login({ username: 'maria', password: 'incorrecta' }),
       ).rejects.toMatchObject({ code: USER_ERROR.INVALID_CREDENTIALS });
+      const admin = await adminTablet();
       await expect(
-        other.authRepository.register({ name: 'Otra María', username: 'MARIA', password: 'secreta1' }),
+        admin.device.userRepository.createAccount({ name: 'Otra María', username: 'MARIA', role: null }),
       ).rejects.toMatchObject({ code: USER_ERROR.USERNAME_TAKEN });
     });
 
@@ -207,14 +241,125 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       expect(await device.orderRepository.list()).toEqual([]);
     });
 
-    it('el administrador ve las altas nuevas sin recargar', async () => {
+    it('otro administrador ve las altas nuevas sin recargar', async () => {
+      const watcher = await adminTablet();
+      const events = collect(watcher.device.userRepository.subscribe);
+      await waitFor(() => isConnected(events), 'admin conectado');
+
+      const other = await adminTablet();
+      await other.device.userRepository.createAccount({ name: 'Nueva Persona', username: 'nueva-persona' });
+
+      await waitFor(() => events.some((event) => event.type === 'users:changed'), 'aviso de alta');
+    });
+
+    it('invitación completa: el admin crea al empleado, el empleado crea su contraseña y entra con su rol', async () => {
+      const admin = await adminTablet();
+      const { user, invitation } = await admin.device.userRepository.createAccount({
+        name: 'Luis Rojas',
+        username: 'luis',
+        role: ROLES.COOK,
+      });
+      expect(user).toMatchObject({ role: ROLES.COOK, passwordSet: false });
+
+      // El empleado abre el enlace en su propio dispositivo.
+      const employee = tablet();
+      expect(await employee.authRepository.getInvitation(invitation.token)).toMatchObject({
+        name: 'Luis Rojas',
+        role: ROLES.COOK,
+        isReset: false,
+      });
+      const signedIn = await employee.authRepository.acceptInvitation(invitation.token, 'clave-segura');
+
+      expect(signedIn).toMatchObject({ username: 'luis', role: ROLES.COOK, passwordSet: true });
+      // Ya tiene acceso sin que nadie haga nada más: ve pedidos...
+      expect(await employee.orderRepository.list()).toEqual([]);
+      // ...y puede volver a entrar con su usuario y contraseña.
+      const later = tablet();
+      expect(await later.authRepository.login({ username: 'luis', password: 'clave-segura' })).toMatchObject({
+        role: ROLES.COOK,
+      });
+    });
+
+    it('la invitación aparece en la lista del admin y desaparece al crear la contraseña', async () => {
       const admin = await adminTablet();
       const events = collect(admin.device.userRepository.subscribe);
       await waitFor(() => isConnected(events), 'admin conectado');
 
-      await registerStaff('nueva-persona');
+      const { invitation } = await admin.device.userRepository.createAccount({
+        name: 'Luis Rojas',
+        username: 'luis',
+        role: ROLES.CASHIER,
+      });
+      let listed = (await admin.device.userRepository.list()).find((u) => u.username === 'luis');
+      expect(listed.passwordSet).toBe(false);
 
-      await waitFor(() => events.some((event) => event.type === 'users:changed'), 'aviso de alta');
+      events.length = 0;
+      await tablet().authRepository.acceptInvitation(invitation.token, 'clave-segura');
+
+      await waitFor(() => events.some((event) => event.type === 'users:changed'), 'aviso al admin');
+      listed = (await admin.device.userRepository.list()).find((u) => u.username === 'luis');
+      expect(listed.passwordSet).toBe(true);
+    });
+
+    it('el enlace sirve una sola vez y uno inventado no sirve', async () => {
+      const admin = await adminTablet();
+      const { invitation } = await admin.device.userRepository.createAccount({
+        name: 'Luis Rojas',
+        username: 'luis',
+        role: ROLES.CASHIER,
+      });
+      await tablet().authRepository.acceptInvitation(invitation.token, 'clave-segura');
+
+      const intruder = tablet();
+      await expect(intruder.authRepository.acceptInvitation(invitation.token, 'otra-clave')).rejects.toMatchObject({
+        code: USER_ERROR.INVITATION_USED,
+      });
+      await expect(intruder.authRepository.getInvitation('inventado')).rejects.toMatchObject({
+        code: USER_ERROR.INVITATION_INVALID,
+      });
+      await expect(intruder.authRepository.acceptInvitation('inventado', 'clave-segura')).rejects.toMatchObject({
+        code: USER_ERROR.INVITATION_INVALID,
+      });
+    });
+
+    it('la cuenta invitada no puede entrar con usuario y contraseña hasta crearla', async () => {
+      const admin = await adminTablet();
+      await admin.device.userRepository.createAccount({ name: 'Luis Rojas', username: 'luis', role: ROLES.COOK });
+
+      await expect(
+        tablet().authRepository.login({ username: 'luis', password: 'clave-segura' }),
+      ).rejects.toMatchObject({ code: USER_ERROR.INVALID_CREDENTIALS });
+    });
+
+    it('solo el administrador crea cuentas y genera enlaces', async () => {
+      const cashier = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const { user: other } = await registerStaff('otro');
+
+      await expect(
+        cashier.device.userRepository.createAccount({ name: 'Intruso', username: 'intruso', role: ROLES.ADMIN }),
+      ).rejects.toMatchObject({ code: USER_ERROR.FORBIDDEN });
+      await expect(cashier.device.userRepository.createInvitation(other.id)).rejects.toMatchObject({
+        code: USER_ERROR.FORBIDDEN,
+      });
+    });
+
+    it('restablecer contraseña: la sesión anterior se cierra al instante y la nueva sirve', async () => {
+      const staff = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const events = collect(staff.device.authRepository.subscribe);
+      await waitFor(() => isConnected(events), 'caja conectada');
+
+      const { invitation } = await staff.admin.device.userRepository.createInvitation(staff.user.id);
+      const fresh = tablet();
+      expect(await fresh.authRepository.getInvitation(invitation.token)).toMatchObject({ isReset: true });
+      await fresh.authRepository.acceptInvitation(invitation.token, 'nueva-clave-1');
+
+      await waitFor(() => events.some((event) => event.type === 'session:expired'), 'sesión anterior cerrada');
+      await expect(
+        tablet().authRepository.login({ username: 'caja1', password: 'secreta1' }),
+      ).rejects.toMatchObject({ code: USER_ERROR.INVALID_CREDENTIALS });
+      await expect(
+        tablet().authRepository.login({ username: 'caja1', password: 'nueva-clave-1' }),
+      ).resolves.toMatchObject({ role: ROLES.CASHIER });
     });
 
     it('solo el administrador puede asignar roles', async () => {
@@ -275,6 +420,150 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     });
   });
 
+  describe('menú', () => {
+    it('empieza vacío y quien tiene acceso a Caja puede leerlo', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const menu = await caja.device.menuRepository.getMenu();
+      expect(menu).toEqual({ categories: [], products: [], extras: [], quickNotes: [] });
+    });
+
+    it('el administrador arma el menú y Caja lo recibe en vivo', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const events = collect(caja.device.menuRepository.subscribe);
+      await waitFor(() => isConnected(events), 'caja conectada');
+
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+      const category = await repo.create('categories', { name: 'Platillos', icon: 'restaurant' });
+      const extra = await repo.create('extras', { name: 'Queso extra', price: 500 });
+      const product = await repo.create('products', {
+        categoryId: category.id,
+        name: 'Casado',
+        kind: 'dish',
+        price: 3500,
+        extraIds: [extra.id],
+      });
+
+      expect(product.menu.products[0]).toMatchObject({ name: 'Casado', price: 3500, extraIds: [extra.id] });
+      await waitFor(
+        () => events.filter((event) => event.type === 'menu:changed').length >= 3,
+        'caja recibe los avisos de cambio',
+      );
+
+      const seenByCashier = await caja.device.menuRepository.getMenu();
+      expect(seenByCashier.products.map((p) => p.name)).toEqual(['Casado']);
+      expect(seenByCashier.extras.map((e) => e.name)).toEqual(['Queso extra']);
+    });
+
+    it('solo el administrador puede modificar el menú', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+
+      await expect(
+        caja.device.menuRepository.create('categories', { name: 'Intento' }),
+      ).rejects.toMatchObject({ code: MENU_ERROR.FORBIDDEN });
+      await expect(caja.device.menuRepository.loadSample()).rejects.toMatchObject({
+        code: MENU_ERROR.FORBIDDEN,
+      });
+      // Cocina no necesita el menú: no lo ve.
+      await expect(cocina.device.menuRepository.getMenu()).rejects.toMatchObject({
+        code: MENU_ERROR.FORBIDDEN,
+      });
+    });
+
+    it('el servidor aplica las reglas del dominio (códigos de error claros)', async () => {
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+      const category = await repo.create('categories', { name: 'Platillos' });
+
+      await expect(repo.create('categories', { name: 'platillos' })).rejects.toMatchObject({
+        code: MENU_ERROR.DUPLICATE_NAME,
+      });
+      await expect(
+        repo.create('products', { categoryId: category.id, name: 'Casado', kind: 'dish', price: 12.5 }),
+      ).rejects.toMatchObject({ code: MENU_ERROR.INVALID_PRICE });
+      await expect(
+        repo.create('products', { categoryId: 'no-existe', name: 'Casado', kind: 'dish', price: 100 }),
+      ).rejects.toMatchObject({ code: MENU_ERROR.CATEGORY_NOT_FOUND });
+      await expect(repo.update('products', 'no-existe', { price: 1 })).rejects.toMatchObject({
+        code: MENU_ERROR.PRODUCT_NOT_FOUND,
+      });
+    });
+
+    it('edita, ordena y elimina; una categoría con productos no se elimina', async () => {
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+      const category = await repo.create('categories', { name: 'Platillos' });
+      const a = await repo.create('products', { categoryId: category.id, name: 'Arroz', kind: 'dish', price: 1000 });
+      const b = await repo.create('products', { categoryId: category.id, name: 'Pollo', kind: 'dish', price: 2000 });
+
+      let menu = await repo.update('products', a.id, { price: 1500, active: false });
+      expect(menu.products.find((p) => p.id === a.id)).toMatchObject({ price: 1500, active: false });
+
+      menu = await repo.move('products', b.id, 'up');
+      const byOrder = [...menu.products].sort((x, y) => x.sortOrder - y.sortOrder).map((p) => p.name);
+      expect(byOrder).toEqual(['Pollo', 'Arroz']);
+
+      await expect(repo.remove('categories', category.id)).rejects.toMatchObject({
+        code: MENU_ERROR.CATEGORY_NOT_EMPTY,
+      });
+
+      await repo.remove('products', a.id);
+      await repo.remove('products', b.id);
+      menu = await repo.remove('categories', category.id);
+      expect(menu.categories).toEqual([]);
+    });
+
+    it('observaciones frecuentes: agregar y quitar (con tildes y espacios)', async () => {
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+
+      let menu = await repo.addQuickNote('Término medio');
+      menu = await repo.addQuickNote('Sin cebolla & ajo');
+      expect(menu.quickNotes).toEqual(['Término medio', 'Sin cebolla & ajo']);
+
+      menu = await repo.removeQuickNote('Sin cebolla & ajo');
+      expect(menu.quickNotes).toEqual(['Término medio']);
+    });
+
+    it('menú de ejemplo: solo se carga con el menú vacío', async () => {
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+
+      const loaded = await repo.loadSample();
+      expect(loaded.products.length).toBeGreaterThan(0);
+
+      await expect(repo.loadSample()).rejects.toMatchObject({ code: MENU_ERROR.MENU_NOT_EMPTY });
+    });
+
+    it('cambiar el menú no altera pedidos ya enviados', async () => {
+      const admin = await adminTablet();
+      const repo = admin.device.menuRepository;
+      const category = await repo.create('categories', { name: 'Platillos' });
+      const created = await repo.create('products', {
+        categoryId: category.id,
+        name: 'Casado',
+        kind: 'dish',
+        price: 3500,
+      });
+      const product = created.menu.products[0];
+
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const draft = addItem(
+        setCustomerName(createDraftOrder({ createdBy: caja.user }), 'Luis Rojas'),
+        createOrderItem({ product, quantity: 2 }),
+      );
+      const sent = await caja.device.orderService.sendToKitchen(draft, caja.user);
+
+      await repo.update('products', product.id, { name: 'Casado nuevo', price: 9999 });
+      await repo.remove('products', product.id);
+
+      const stored = await caja.device.orderRepository.getById(sent.id);
+      expect(stored.items[0]).toMatchObject({ name: 'Casado', unitPrice: 3500 });
+      expect(stored.totals.total).toBe(7000);
+    });
+  });
+
   describe('flujo de pedidos', () => {
     it('el pedido enviado por caja aparece en cocina y los cambios llegan a caja', async () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
@@ -302,6 +591,35 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       await cocina.device.orderService.markReady(sent.id, cocina.user);
       await caja.device.orderService.markDelivered(sent.id, caja.user);
       expect(await cocina.device.orderService.listKitchenOrders()).toHaveLength(0);
+    });
+
+    it('el pedido debe llevar nombre del cliente y cocina lo recibe', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+      const cocinaEvents = collect(cocina.device.orderRepository.subscribe);
+      await waitFor(() => isConnected(cocinaEvents), 'cocina conectada');
+
+      // Sin nombre no sale de Caja (lo frena el dominio).
+      await expect(
+        caja.device.orderService.sendToKitchen(draftFor(caja.user, ''), caja.user),
+      ).rejects.toMatchObject({ code: ORDER_ERROR.CUSTOMER_NAME_REQUIRED });
+
+      // Un cliente que se salte esa regla tampoco logra guardarlo en el servidor.
+      const forged = {
+        ...sendOrderToKitchen(draftFor(caja.user), { number: 1, user: caja.user }),
+        customerName: '',
+      };
+      await expect(caja.device.orderRepository.save(forged)).rejects.toMatchObject({
+        code: ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+      });
+
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user, 'Ana Mora'), caja.user);
+      expect(sent.customerName).toBe('Ana Mora');
+      await waitFor(
+        () => cocinaEvents.some((event) => event.type === 'order:saved' && event.order.id === sent.id),
+        'cocina recibe el pedido',
+      );
+      expect(cocinaEvents.find((event) => event.type === 'order:saved').order.customerName).toBe('Ana Mora');
     });
 
     it('cada rol solo puede hacer lo suyo', async () => {

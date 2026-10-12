@@ -15,6 +15,7 @@ import {
   inspectDatabase,
 } from '../src/diagnostics/databaseCheck';
 import { createPgDb } from '../src/store/createPgDb';
+import { createPostgresMenuStore } from '../src/store/createPostgresMenuStore';
 import { createPostgresStore } from '../src/store/createPostgresStore';
 import { createPostgresUserStore } from '../src/store/createPostgresUserStore';
 
@@ -67,6 +68,7 @@ async function main() {
       console.log('\nCreando tablas (--init)');
       await createPostgresStore(db).init();
       await createPostgresUserStore(db).init();
+      await createPostgresMenuStore(db).init();
       ok('Esquema aplicado.');
       report = await inspectDatabase(db);
     }

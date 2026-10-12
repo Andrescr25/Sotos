@@ -1,5 +1,6 @@
 import { createId } from '@/shared/utils/createId';
 import { can } from '@/domain/users/permissions';
+import { cleanCustomerName, isValidCustomerName } from './customerName';
 import { ORDER_ERROR, OrderError } from './orderErrors';
 import { getItemKey, mergeItems, withNotes, withQuantity } from './orderItem';
 import { calculateOrderTotals } from './pricing';
@@ -26,6 +27,7 @@ import { ORDER_TYPE } from './orderType';
  * @property {string | null} tableId  reservado para el módulo de mesas
  * @property {string} status  ver ORDER_STATUS
  * @property {import('./orderItem').OrderItem[]} items
+ * @property {string} customerName  nombre del cliente: obligatorio para enviar a cocina
  * @property {string} note  observación general del pedido
  * @property {Actor} createdBy  quién tomó el pedido
  * @property {string} createdAt
@@ -86,6 +88,7 @@ export function createDraftOrder({
     tableId,
     status: ORDER_STATUS.DRAFT,
     items: [],
+    customerName: '',
     note: '',
     createdBy: actor,
     createdAt: at,
@@ -171,6 +174,19 @@ export function removeItem(order, itemId, now = new Date()) {
 }
 
 /**
+ * Nombre del cliente. Es obligatorio para poder enviar el pedido a cocina
+ * (y será el nombre de la factura cuando exista la facturación).
+ * @param {Order} order
+ * @param {string} name
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function setCustomerName(order, name, now = new Date()) {
+  assertEditable(order);
+  return { ...order, customerName: cleanCustomerName(name), updatedAt: now.toISOString() };
+}
+
+/**
  * Observación general del pedido.
  * @param {Order} order
  * @param {string} note
@@ -207,6 +223,16 @@ export function changeOrderStatus(order, nextStatus, { user, now = new Date() })
   }
   if (order.status === ORDER_STATUS.DRAFT && nextStatus === ORDER_STATUS.NEW && order.items.length === 0) {
     throw new OrderError(ORDER_ERROR.EMPTY_ORDER, 'El pedido no tiene productos');
+  }
+  if (
+    order.status === ORDER_STATUS.DRAFT &&
+    nextStatus === ORDER_STATUS.NEW &&
+    !isValidCustomerName(order.customerName)
+  ) {
+    throw new OrderError(
+      ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+      'El pedido debe llevar el nombre del cliente',
+    );
   }
 
   const at = now.toISOString();

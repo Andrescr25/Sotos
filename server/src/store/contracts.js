@@ -14,11 +14,19 @@
  * @property {(day: string) => Promise<number>} nextOrderNumber  atómico; `day` = "YYYY-MM-DD"
  * @property {() => Promise<void>} close
  *
+ * @typedef {Object} MenuStore
+ * @property {() => Promise<void>} init
+ * @property {() => Promise<import('@/domain/menu/types').Menu>} getMenu  vacío si aún no hay menú
+ * @property {(apply: (menu: import('@/domain/menu/types').Menu) => import('@/domain/menu/types').Menu) => Promise<import('@/domain/menu/types').Menu>} updateMenu
+ *   Aplica un cambio de forma atómica (bloqueo de fila en Postgres). Si `apply`
+ *   lanza MenuError no se guarda nada.
+ * @property {() => Promise<void>} close
+ *
  * @typedef {Object} NewUserRecord
  * @property {string} id
  * @property {string} username
  * @property {string} name
- * @property {string} passwordHash
+ * @property {string | null} passwordHash  null = cuenta invitada, aún sin contraseña
  * @property {string | null} role
  * @property {boolean} active
  * @property {string} createdAt
@@ -32,6 +40,12 @@
  * @property {() => Promise<import('@/domain/users/roles').User[]>} listUsers
  * @property {(id: string, changes: { role?: string | null, active?: boolean }) => Promise<import('@/domain/users/roles').User>} updateAccess
  *   Aplica `applyAccessChange` de forma atómica; lanza UserError si no procede.
+ * @property {(invitation: { tokenHash: string, userId: string, createdById: string | null, createdAt: string, expiresAt: string }) => Promise<void>} createInvitation
+ *   Reemplaza cualquier invitación sin usar de esa cuenta: solo el último enlace sirve.
+ * @property {(tokenHash: string) => Promise<{ user: import('@/domain/users/roles').User, expiresAt: string, usedAt: string | null } | null>} getInvitation
+ * @property {(args: { tokenHash: string, passwordHash: string, now: Date }) => Promise<{ ok: true, user: import('@/domain/users/roles').User } | { ok: false, code: string }>} acceptInvitation
+ *   Atómico: valida el enlace, guarda la contraseña, lo marca usado y cierra
+ *   las sesiones anteriores de la cuenta.
  * @property {() => Promise<number>} countUsers
  * @property {() => Promise<boolean>} hasAdmin
  * @property {(session: { tokenHash: string, userId: string, createdAt: string, expiresAt: string }) => Promise<void>} createSession

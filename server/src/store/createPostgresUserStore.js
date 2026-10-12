@@ -1,7 +1,7 @@
 import { USER_ERROR, applyAccessChange } from '@/domain/users';
 import { USER_SCHEMA } from './schema';
 
-const USER_COLUMNS = 'id, username, name, role, active, created_at';
+const USER_COLUMNS = 'id, username, name, role, active, created_at, (password_hash IS NOT NULL) AS password_set';
 
 const toUser = (row) => ({
   id: row.id,
@@ -9,6 +9,7 @@ const toUser = (row) => ({
   name: row.name,
   role: row.role,
   active: row.active,
+  passwordSet: row.password_set,
   createdAt: new Date(row.created_at).toISOString(),
 });
 
@@ -28,13 +29,13 @@ export function createPostgresUserStore(db) {
     },
 
     async createUser(record) {
-      // ON CONFLICT cubre tanto un usuario repetido como dos registros simultáneos.
+      // ON CONFLICT cubre tanto un usuario repetido como dos altas simultáneas.
       const { rows } = await db.query(
         `INSERT INTO users (id, username, name, password_hash, role, active, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (username) DO NOTHING
          RETURNING ${USER_COLUMNS}`,
-        [record.id, record.username, record.name, record.passwordHash, record.role, record.active, record.createdAt],
+        [record.id, record.username, record.name, record.passwordHash ?? null, record.role, record.active, record.createdAt],
       );
       if (rows.length === 0) {
         return { ok: false, code: USER_ERROR.USERNAME_TAKEN, message: 'Ese usuario ya existe' };
@@ -77,6 +78,72 @@ export function createPostgresUserStore(db) {
           updated.active,
         ]);
         return updated;
+      });
+    },
+
+    async createInvitation({ tokenHash, userId, createdById, createdAt, expiresAt }) {
+      await db.transaction(async (tx) => {
+        // Solo el último enlace sirve: se retiran los anteriores sin usar.
+        await tx.query('DELETE FROM invitations WHERE user_id = $1 AND used_at IS NULL', [userId]);
+        await tx.query(
+          `INSERT INTO invitations (token_hash, user_id, created_by_id, created_at, expires_at)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [tokenHash, userId, createdById, createdAt, expiresAt],
+        );
+      });
+    },
+
+    async getInvitation(tokenHash) {
+      const { rows } = await db.query(
+        `SELECT i.expires_at, i.used_at, u.id, u.username, u.name, u.role, u.active, u.created_at,
+                (u.password_hash IS NOT NULL) AS password_set
+           FROM invitations i JOIN users u ON u.id = i.user_id
+          WHERE i.token_hash = $1`,
+        [tokenHash],
+      );
+      if (rows.length === 0) return null;
+      const row = rows[0];
+      return {
+        user: toUser(row),
+        expiresAt: new Date(row.expires_at).toISOString(),
+        usedAt: row.used_at ? new Date(row.used_at).toISOString() : null,
+      };
+    },
+
+    async acceptInvitation({ tokenHash, passwordHash, now }) {
+      return db.transaction(async (tx) => {
+        // Bloquea la invitación: dos aperturas simultáneas del mismo enlace
+        // no pueden crear dos contraseñas.
+        const found = await tx.query(
+          'SELECT user_id, expires_at, used_at FROM invitations WHERE token_hash = $1 FOR UPDATE',
+          [tokenHash],
+        );
+        if (found.rows.length === 0) return { ok: false, code: USER_ERROR.INVITATION_INVALID };
+
+        const invitation = found.rows[0];
+        if (invitation.used_at) return { ok: false, code: USER_ERROR.INVITATION_USED };
+        if (new Date(invitation.expires_at).getTime() <= now.getTime()) {
+          return { ok: false, code: USER_ERROR.INVITATION_EXPIRED };
+        }
+
+        const owner = await tx.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1 FOR UPDATE`, [
+          invitation.user_id,
+        ]);
+        if (owner.rows.length === 0) return { ok: false, code: USER_ERROR.INVITATION_INVALID };
+        if (!owner.rows[0].active) return { ok: false, code: USER_ERROR.ACCOUNT_DISABLED };
+
+        await tx.query('UPDATE users SET password_hash = $2 WHERE id = $1', [
+          invitation.user_id,
+          passwordHash,
+        ]);
+        await tx.query('UPDATE invitations SET used_at = $2 WHERE token_hash = $1', [
+          tokenHash,
+          now.toISOString(),
+        ]);
+        // Una contraseña nueva cierra las sesiones anteriores de la cuenta.
+        await tx.query('DELETE FROM sessions WHERE user_id = $1', [invitation.user_id]);
+
+        return { ok: true, user: { ...toUser(owner.rows[0]), passwordSet: true } };
       });
     },
 

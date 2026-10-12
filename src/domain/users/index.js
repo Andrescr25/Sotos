@@ -5,6 +5,8 @@ export { USER_ERROR, UserError } from './userErrors';
 export {
   PASSWORD_MIN_LENGTH,
   normalizeUsername,
-  validateRegistration,
+  validateNewAccount,
+  validatePassword,
+  suggestUsername,
   applyAccessChange,
 } from './userRules';

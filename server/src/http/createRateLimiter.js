@@ -1,6 +1,6 @@
 /**
  * Limitador simple en memoria: máximo `max` intentos por `windowMs` y clave.
- * Protege el inicio de sesión y el registro de fuerza bruta. Suficiente para
+ * Protege el inicio de sesión y las invitaciones de la fuerza bruta. Suficiente para
  * una sola instancia (ver límites en docs/DESPLIEGUE_RENDER.md).
  *
  * @param {{ max: number, windowMs: number, now?: () => number }} options

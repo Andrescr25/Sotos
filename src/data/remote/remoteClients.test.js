@@ -259,6 +259,29 @@ describe('cliente de tiempo real', () => {
     unsubscribe();
   });
 
+  it('el cierre de una sesión VIEJA no expira la sesión nueva del mismo dispositivo', async () => {
+    const { realtime, session } = await createClient();
+    const expired = jest.fn();
+    session.subscribe(expired);
+    const unsubscribe = realtime.subscribe(() => {});
+    const oldSocket = FakeWebSocket.instances[0]; // conectada con "tok123"
+
+    // La persona crea su contraseña con un enlace: queda una sesión nueva.
+    await session.set('tok-nuevo');
+    oldSocket.serverCloses(4401);
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(expired).not.toHaveBeenCalled();
+    expect(session.get()).toBe('tok-nuevo');
+
+    // Se reconecta con la sesión vigente.
+    jest.advanceTimersByTime(100);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    FakeWebSocket.instances[1].onopen?.();
+    expect(FakeWebSocket.instances[1].sent[0]).toEqual({ type: 'auth', token: 'tok-nuevo' });
+    unsubscribe();
+  });
+
   it('no reintenta cuando ya no queda nadie suscrito', async () => {
     const { realtime } = await createClient();
     const unsubscribe = realtime.subscribe(() => {});

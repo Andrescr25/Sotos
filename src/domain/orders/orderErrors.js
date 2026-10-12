@@ -4,6 +4,8 @@ export const ORDER_ERROR = Object.freeze({
   INVALID_QUANTITY: 'invalid_quantity',
   INVALID_NUMBER: 'invalid_number',
   EMPTY_ORDER: 'empty_order',
+  /** La cuenta que sale de Caja debe llevar el nombre del cliente. */
+  CUSTOMER_NAME_REQUIRED: 'customer_name_required',
   NOT_EDITABLE: 'not_editable',
   ORDER_NOT_FOUND: 'order_not_found',
   ITEM_NOT_FOUND: 'item_not_found',

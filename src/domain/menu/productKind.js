@@ -4,6 +4,6 @@ export const PRODUCT_KIND = Object.freeze({
 });
 
 export const PRODUCT_KIND_LABELS = Object.freeze({
-  [PRODUCT_KIND.DISH]: 'Plato',
+  [PRODUCT_KIND.DISH]: 'Platillo',
   [PRODUCT_KIND.DRINK]: 'Bebida',
 });

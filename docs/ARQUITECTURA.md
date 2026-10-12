@@ -8,10 +8,11 @@ existen, cómo fluye un pedido y dónde se enchufan las funciones futuras.
 **Incluye:** menú (categorías, productos, extras, bebidas), pedidos con
 observaciones, cálculo de totales, envío a cocina, estados, quién tomó el
 pedido y cuándo, cuentas con acceso asignado por el administrador, pantallas de
-caja, cocina y administración de usuarios.
+caja, cocina, administración de usuarios y **gestión del menú** (platillos,
+bebidas, extras, categorías y observaciones frecuentes).
 
 **No incluye todavía:** facturación, inventario, reportes, cierres de caja,
-contabilidad, mesas, pagos, división de cuentas, delivery, gestión de productos.
+contabilidad, mesas, pagos, división de cuentas, delivery.
 
 ## 2. Stack
 
@@ -42,14 +43,15 @@ src/
 │   ├── cashier/    toma de pedidos y entrega
 │   ├── kitchen/    tablero de cocina
 │   ├── orders/     piezas compartidas: lista en vivo, detalle de líneas, estado
-│   └── admin/      inicio de administración y usuarios y accesos
+│   ├── menu/       useMenu: el menú en vivo (lo usan Caja y Administración)
+│   └── admin/      inicio, usuarios y accesos, y gestión del menú
 │
 ├── services/       Casos de uso: combinan dominio + repositorios.
 │   └── orderService, authService, userService, menuService
 │
 ├── domain/         Reglas de negocio. JavaScript puro: sin React, sin red, sin I/O.
 │   ├── orders/     pedido, líneas, estados, precios, integridad, errores
-│   ├── menu/       categorías, productos, extras, consultas del menú
+│   ├── menu/       categorías, productos, extras; operaciones del administrador y consultas
 │   └── users/      roles, permisos, acceso por zona, reglas de cuentas
 │
 ├── data/           Acceso a datos detrás de contratos.
@@ -82,7 +84,7 @@ server/             Backend (paquete Node independiente, se despliega en Render;
     ├── security/           Hash de contraseñas (scrypt) y tokens
     ├── http/               Rutas de auth, usuarios y pedidos; permisos; límite de intentos
     ├── realtime/           Canal WebSocket (sesión, latido, difusión por rol)
-    └── store/              Almacenes de pedidos y de usuarios: Postgres y memoria
+    └── store/              Almacenes de pedidos, usuarios y menú: Postgres y memoria
 ```
 
 El servidor **reutiliza `src/domain`** (se empaqueta con esbuild, alias `@/`):
@@ -116,9 +118,11 @@ User ───< Order 1 ───< OrderItem 1 ───< OrderItemExtra
 |---|---|
 | **Category** | `id`, `name`, `icon`, `sortOrder`, `active` |
 | **Product** | `id`, `categoryId`, `name`, `kind` (`dish`/`drink`), `price`, `extraIds[]`, `sortOrder`, `active` |
-| **Extra** | `id`, `name`, `price`, `active` (reutilizable entre productos) |
-| **User** | `id`, `username`, `name`, `role` (`cashier`/`cook`/`admin` o **`null`**), `active`, `createdAt` |
-| **Order** | `id`, `number`, `type`, `tableId`, `status`, `items[]`, `note`, `createdBy`, `createdAt`, `updatedAt`, `statusHistory[]`, `totals` |
+| **Extra** | `id`, `name`, `price`, `sortOrder`, `active` (reutilizable entre productos) |
+| **Menu** | `categories[]`, `products[]`, `extras[]`, `quickNotes[]` — un único documento |
+| **User** | `id`, `username`, `name`, `role` (`cashier`/`cook`/`admin` o **`null`**), `active`, `passwordSet`, `createdAt` |
+| **Invitation** | `tokenHash`, `userId`, `createdById`, `expiresAt`, `usedAt` (solo servidor) |
+| **Order** | `id`, `number`, `type`, `tableId`, `status`, `items[]`, **`customerName`**, `note`, `createdBy`, `createdAt`, `updatedAt`, `statusHistory[]`, `totals` |
 | **OrderItem** | `id`, `productId`, `name`*, `kind`*, `unitPrice`*, `quantity`, `extras[]`, `notes[]` |
 | **OrderItemExtra** | `extraId`, `name`*, `unitPrice`*, `quantity` |
 | **StatusChange** | `status`, `at`, `by` (quién y cuándo) |
@@ -138,19 +142,56 @@ menú después no altera pedidos ya tomados (clave para facturación e historial
 - **Observaciones:** por línea (`notes[]`, con atajos `quickNotes` del menú) y por pedido (`note`).
 - **Funciones puras e inmutables.** Cada operación devuelve un pedido nuevo; el
   tiempo (`now`) se inyecta, lo que hace las reglas fáciles de probar.
+- **Toda cuenta lleva el nombre del cliente.** `customerName` es obligatorio
+  para enviar un pedido a cocina (mín. 2 caracteres y alguna letra; "Mesa 5" o
+  "Ana M." valen, "." o "12" no). Lo exigen el dominio (`sendOrderToKitchen`),
+  el servidor (`checkOrderWrite`) y la interfaz (el botón de enviar queda
+  deshabilitado). No se puede cambiar después de enviado. Cocina y "Listos"
+  lo muestran, y será el nombre de la factura cuando exista la facturación.
+- **El menú es un documento.** Se guarda completo (JSONB) y cada cambio del
+  administrador es una función pura de `domain/menu` aplicada de forma atómica:
+  dos administradores editando a la vez se aplican uno tras otro.
+- **Ocultar vs. eliminar.** `active: false` oculta algo de Caja sin perderlo.
+  Eliminar es definitivo; una categoría con productos no se puede eliminar, y
+  al eliminar un extra se quita de los productos que lo ofrecían.
+- **Los pedidos no dependen del menú vivo:** guardan copia de nombre y precio,
+  así que editar o eliminar productos nunca altera pedidos ya tomados.
 
 ## 5. Acceso y roles
 
-**El personal no elige ni conoce su rol.** Se registra (o inicia sesión) y es el
-**administrador** quien le asigna el acceso.
+**El personal no elige ni conoce su rol, y no existe el registro abierto**:
+solo entra quien el **administrador** invita.
 
 ```
-Crear cuenta ──▶ role = null ──▶ "Acceso pendiente"
-                       │
-        el admin asigna rol (Usuarios y accesos)
-                       ▼
+Invitar empleado: nombre, usuario, rol
+        │
+   se genera un ENLACE de un solo uso (el admin lo copia y lo envía)
+        │
+   el empleado lo abre y crea su contraseña
+        ▼
+   entra directo con el rol ya asignado
         Cajero → /caja     Cocinero → /cocina     Administrador → /admin
+
+   (si el admin lo dejó "Sin acceso todavía" ve "Acceso pendiente"
+    hasta que el admin le asigna el rol)
 ```
+
+### Invitaciones
+
+- Al invitar se crea la cuenta **sin contraseña** (`passwordSet: false`), con el
+  rol elegido (o ninguno). Mientras no la cree, no puede iniciar sesión.
+- El enlace es `…/invitacion/<token>`: token aleatorio de 256 bits, **de un solo
+  uso**, vigencia 7 días (`INVITE_TTL_DAYS`). En la base solo se guarda su hash:
+  el enlace se ve **una vez**; si se pierde, se genera uno nuevo y el anterior
+  deja de servir.
+- **El mismo mecanismo restablece contraseñas:** el admin genera un enlace para
+  quien ya tiene cuenta; al usarlo, la contraseña anterior y todas sus sesiones
+  se cierran (también en vivo, en sus otros dispositivos).
+- Abrir el enlace y crear la contraseña son dos llamadas públicas (con límite
+  de intentos); el token viaja en el **cuerpo** de la petición, no en la ruta de
+  la API, para que no quede en los registros de acceso.
+- El empleado queda con la sesión abierta y su rol; el admin ve en la lista
+  cómo la invitación pasa de "pendiente" a "creó su contraseña".
 
 - El rol llega a la persona **al instante** por el canal en tiempo real: su
   pantalla cambia sola, sin cerrar sesión.
@@ -165,6 +206,8 @@ Crear cuenta ──▶ role = null ──▶ "Acceso pendiente"
 | Permiso | Cajero | Cocinero | Admin |
 |---|:-:|:-:|:-:|
 | Ver pedidos | ✅ | ✅ | ✅ |
+| Ver el menú | ✅ | — | ✅ |
+| Administrar el menú (agregar, editar, ordenar, eliminar) | — | — | ✅ |
 | Crear / enviar pedido | ✅ | — | ✅ |
 | Ver cocina | — | ✅ | ✅ |
 | Empezar preparación / marcar listo | — | ✅ | ✅ |
@@ -236,12 +279,21 @@ Todas las rutas exigen `Authorization: Bearer <token>`, salvo las marcadas.
 | Ruta | Función | Permiso |
 |---|---|---|
 | `GET /health` | Estado del servicio (público) | — |
-| `POST /auth/register` | Crea cuenta **sin rol** y abre sesión (público, limitado) | — |
 | `POST /auth/login` | Inicia sesión (público, limitado) | — |
 | `POST /auth/logout` | Cierra la sesión | sesión |
 | `GET /auth/me` | Cuenta actual, con el rol vigente | sesión |
 | `GET /users` | Lista de cuentas | administrar usuarios |
+| `POST /users` | Crea la cuenta de un empleado (sin contraseña) y devuelve su enlace | administrar usuarios |
+| `POST /users/:id/invitation` | Enlace nuevo (invitación perdida o contraseña olvidada) | administrar usuarios |
+| `POST /invitations/lookup` | Qué cuenta es la del enlace (público, limitado) | — |
+| `POST /invitations/accept` | Crea la contraseña y abre sesión (público, limitado) | — |
 | `PATCH /users/:id` | Asigna rol / habilita o deshabilita | administrar usuarios |
+| `GET /menu` | El menú completo | ver el menú |
+| `POST /menu/{categories,products,extras}` | Crear (devuelve `id` y el menú) | administrar el menú |
+| `PATCH` / `DELETE /menu/{…}/:id` | Editar / eliminar | administrar el menú |
+| `POST /menu/{…}/:id/move` | Subir o bajar (`direction: up/down`) | administrar el menú |
+| `POST` / `DELETE /menu/quick-notes` | Agregar / quitar una observación frecuente | administrar el menú |
+| `POST /menu/sample` | Cargar el menú de ejemplo (solo con el menú vacío) | administrar el menú |
 | `GET /orders?statuses=new,ready` | Lista pedidos | ver pedidos |
 | `GET /orders/:id` | Un pedido | ver pedidos |
 | `PUT /orders/:id` | Guarda o avanza un pedido | según la transición |
@@ -250,7 +302,8 @@ Todas las rutas exigen `Authorization: Bearer <token>`, salvo las marcadas.
 
 **Eventos en tiempo real:** `order:saved` (a quien puede ver pedidos),
 `user:updated` (a la persona cuyo rol o estado cambió), `users:changed` (a los
-administradores cuando hay altas o cambios).
+administradores cuando hay altas o cambios) y `menu:changed` (a Caja y
+Administración cuando el administrador edita el menú: recargan solos).
 
 **Garantías del servidor**
 
@@ -282,11 +335,13 @@ administradores cuando hay altas o cambios).
 
 | Zona | Qué hace |
 |---|---|
-| **Login / Registro** | Usuario y contraseña. Sin selector de rol. |
+| **Login** | Usuario y contraseña. Sin selector de rol y sin "Crear cuenta": las cuentas las crea el administrador. |
 | **Acceso pendiente** | Cuenta sin rol; se actualiza sola cuando el admin asigna acceso. |
 | **Caja** | Categorías → productos → (extras y observaciones) → resumen → enviar. Botón "Listos (n)" para entregar. En pantallas anchas (≥ 900 px) el resumen va a la derecha; en estrechas se apila debajo. |
 | **Cocina** | Tablero Nuevos / En preparación / Listos con tarjetas grandes: número, hora, tiempo transcurrido (verde/ámbar/rojo), líneas con extras y observaciones, botón del siguiente paso. |
-| **Administración** | Inicio con atajos y aviso de cuentas pendientes; "Usuarios y accesos" para asignar rol y habilitar. |
+| **Administración** | Inicio con atajos y aviso de cuentas pendientes; "Usuarios y accesos" para invitar empleados, asignar rol, habilitar y restablecer contraseñas. |
+| **Invitación** (empleado) | `/invitacion/<token>`: saluda por nombre, muestra su acceso y pide crear la contraseña. Maneja enlace inválido, vencido o ya usado. |
+| **Menú** (administrador) | Pestañas *Platillos y bebidas*, *Extras*, *Categorías* y *Observaciones*: crear, editar, ocultar, ordenar con flechas y eliminar con confirmación. Si el menú está vacío ofrece crear la primera categoría o cargar un menú de ejemplo. Caja ve los cambios al instante. |
 
 Los umbrales de color de la cocina están en `features/kitchen/config.js`.
 
@@ -314,14 +369,15 @@ márgenes ni tamaños de fuente sueltos.
 | **Mesas** | Nuevo `domain/tables`. `Order.tableId` y `ORDER_TYPE.DINE_IN` ya existen. |
 | **Pagos** | Nuevo `domain/payments` (`Payment` referencia `orderId`). El estado de pago es una dimensión **separada** del estado de cocina, para no mezclar ambos flujos. |
 | **División de cuentas** | Agrupar líneas por cuenta (`checkId` en `OrderItem`) y calcular totales por cuenta en `pricing.js`. |
-| **Facturación electrónica** | Nuevo `domain/billing`. Los pedidos ya guardan precios y nombres como copia; impuestos (IVA) se calculan en `pricing.js`. |
+| **Facturación electrónica** | Nuevo `domain/billing`. Los pedidos ya guardan precios, nombres y el **nombre del cliente** (`customerName`) como copia; impuestos (IVA) se calculan en `pricing.js`. |
 | **Inventario** | Nuevo `domain/inventory` (recetas/consumo). Reacciona a eventos de `orderService` (p. ej. al pasar a `in_progress`); no modifica el flujo de pedidos. |
 | **Para llevar / Delivery** | `ORDER_TYPE` ya los define. Agregar datos de cliente (`customer`) y, para delivery, nuevos estados en la tabla de transiciones. |
 | **Barra vs cocina** | Agregar `station` a `Product`; cada pantalla filtra por estación. |
 | **Agregar productos a un pedido ya enviado** | Hoy solo se edita un borrador. Opción: "rondas" (cada envío es una ronda con su hora). |
 | **Roles nuevos** | `domain/users/roles.js` + `permissions.js` (+ `access.js` si abre una zona). |
-| **Gestión de menú / reportes** | `features/admin` + casos de uso en `services/`; los repositorios se amplían con escritura. |
-| **Restablecer contraseña** | Acción del administrador en `services/userService` + ruta `PATCH /users/:id`. |
+| **Reportes** | `features/admin` + casos de uso en `services/`; los repositorios se amplían con consultas. |
+| **Fotos o descripciones de productos** | Campos nuevos en `Product` + `domain/menu/menuRules.js`; el documento del menú no necesita migración. |
+| **Registro cerrado** | Si el restaurante prefiere solo invitaciones, bastaría una variable que desactive `POST /auth/register` y oculte "Crear cuenta". |
 
 ## 11. Decisiones pendientes
 
@@ -329,8 +385,8 @@ márgenes ni tamaños de fuente sueltos.
 datos en **Supabase** (Postgres, conexión por Session pooler); acceso por
 cuenta con rol asignado por el administrador.
 
-1. **Restablecer contraseña / editar datos de una cuenta** desde administración.
-   Hoy quien la olvida debe crear otra cuenta.
+1. **Cambiar la propia contraseña** desde la app (hoy se hace con un enlace del
+   administrador) y editar nombre/usuario de una cuenta.
 2. **Modo sin conexión:** hoy, sin red, enviar un pedido falla con `network`
    (el borrador se conserva y se puede reintentar). Falta una cola de envíos
    pendientes en la tablet de caja.
@@ -339,8 +395,8 @@ cuenta con rol asignado por el administrador.
 4. **Reglas de cancelación:** ¿cocina debe confirmar cancelaciones de pedidos
    ya en preparación? Hoy cajero y admin cancelan directamente. Tampoco hay
    botón de cancelar en la pantalla de caja todavía.
-5. **Menú desde el servidor:** hoy es un seed en memoria; pasará al backend con
-   la administración de productos.
+5. **Menú:** en producción empieza vacío (el administrador lo arma o carga el
+   de ejemplo). Falta importar desde un archivo y fotos/descripciones.
 6. **Escalado:** el canal en tiempo real vive en un solo proceso. Suficiente
    para un restaurante; con varias instancias haría falta un bus compartido.
 7. **Plan de Supabase:** el gratuito pausa el proyecto tras 7 días de poca

@@ -1,12 +1,15 @@
 import pg from 'pg';
+import { menuSeed } from '@/data/seed/menu';
 import { usersSeed } from '@/data/seed/users';
 import { describeConnectionProblem, getPoolOptions, loadConfig } from './config';
 import { explainConnectionError, isDatabaseError } from './diagnostics/databaseCheck';
 import { createApp } from './createApp';
 import { hashPassword } from './security/passwords';
+import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
 import { createPgDb } from './store/createPgDb';
+import { createPostgresMenuStore } from './store/createPostgresMenuStore';
 import { createPostgresStore } from './store/createPostgresStore';
 import { createPostgresUserStore } from './store/createPostgresUserStore';
 
@@ -23,12 +26,15 @@ async function main() {
 
   let orderStore;
   let userStore;
+  let menuStore;
   const inMemory = !config.databaseUrl;
 
   if (inMemory) {
     console.warn('DATABASE_URL no definida: usando memoria (los datos se pierden al reiniciar).');
     orderStore = createMemoryStore();
     userStore = createMemoryUserStore();
+    // En desarrollo local el menú arranca con datos de ejemplo.
+    menuStore = createMemoryMenuStore(menuSeed);
   } else {
     const problem = describeConnectionProblem(config.databaseUrl);
     if (problem) console.warn(problem);
@@ -37,12 +43,15 @@ async function main() {
     const db = createPgDb(pool);
     orderStore = createPostgresStore(db);
     userStore = createPostgresUserStore(db);
+    // En producción el menú empieza vacío: lo arma el administrador.
+    menuStore = createPostgresMenuStore(db);
   }
 
   await orderStore.init();
   await userStore.init();
+  await menuStore.init();
 
-  const app = createApp({ orderStore, userStore, config });
+  const app = createApp({ orderStore, userStore, menuStore, config });
 
   if (inMemory) {
     await seedDevelopmentUsers(userStore);
@@ -68,6 +77,7 @@ async function main() {
     await app.close();
     await orderStore.close();
     await userStore.close();
+    await menuStore.close();
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -11,6 +11,7 @@ import {
   createDraftOrder,
   createOrderItem,
   sendOrderToKitchen,
+  setCustomerName,
 } from '@/domain/orders';
 import { createMemoryStore } from './createMemoryStore';
 import { createPostgresStore } from './createPostgresStore';
@@ -22,7 +23,7 @@ const at = (minutes) => new Date(T0.getTime() + minutes * 60_000);
 
 function sentOrder(number = 1, createdAt = T0) {
   const draft = addItem(
-    createDraftOrder({ createdBy: cashier, now: createdAt }),
+    setCustomerName(createDraftOrder({ createdBy: cashier, now: createdAt }), 'María Pérez', createdAt),
     createOrderItem({ product: findProduct(menuSeed, 'prod-papas'), quantity: 1 }),
     createdAt,
   );

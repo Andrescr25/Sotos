@@ -57,10 +57,8 @@ export default function LoginScreen() {
         onPress={submit}
         disabled={busy || !username || !password}
       />
-      <Button label="Crear cuenta" icon="person-add" variant="secondary" onPress={() => router.push('/registro')} />
-
       <Text variant="caption" color="textSecondary" style={styles.note}>
-        ¿Primera vez? Crea tu cuenta; un administrador te asignará tu acceso.
+        ¿Primera vez? Tu administrador te enviará un enlace para crear tu contraseña.
       </Text>
 
       {devAccounts.length > 0 ? (

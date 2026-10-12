@@ -84,8 +84,17 @@ export function createRealtimeClient({
     scheduleReconnect();
   }
 
-  /** El servidor no acepta este token: la sesión terminó. No se reintenta. */
-  function handleRejected() {
+  /**
+   * El servidor no acepta este token: la sesión terminó. No se reintenta.
+   * Solo si ese token sigue siendo el de la sesión actual: si la persona ya
+   * inició una sesión nueva en este dispositivo, el cierre de la vieja no debe
+   * llevarse a la nueva.
+   */
+  function handleRejected(rejectedToken) {
+    if (session.get() !== rejectedToken) {
+      handleLost(); // se reconecta con el token vigente
+      return;
+    }
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
     dropSocket();
@@ -133,7 +142,7 @@ export function createRealtimeClient({
     };
 
     current.onclose = (event) => {
-      if (REJECTED_CODES.includes(event?.code)) handleRejected();
+      if (REJECTED_CODES.includes(event?.code)) handleRejected(token);
       else handleLost();
     };
     current.onerror = () => {}; // siempre va seguido de onclose

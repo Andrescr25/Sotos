@@ -10,7 +10,6 @@ import AdminScreen from '@/features/admin/screens/AdminScreen';
 import UsersScreen from '@/features/admin/screens/UsersScreen';
 import LoginScreen from '@/features/auth/screens/LoginScreen';
 import PendingAccessScreen from '@/features/auth/screens/PendingAccessScreen';
-import RegisterScreen from '@/features/auth/screens/RegisterScreen';
 import CashierScreen from '@/features/cashier/screens/CashierScreen';
 import KitchenScreen from '@/features/kitchen/screens/KitchenScreen';
 import { authService, orderService } from '@/services';
@@ -56,6 +55,13 @@ describe('acceso', () => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
+  it('no ofrece crear cuenta: las cuentas las crea el administrador', async () => {
+    await renderWithAuth(<LoginScreen />);
+
+    expect(screen.queryByRole('button', { name: /Crear cuenta/ })).toBeNull();
+    expect(screen.getByText(/Tu administrador te enviará un enlace/)).toBeTruthy();
+  });
+
   it('no ofrece elegir un rol: solo usuario y contraseña', async () => {
     await renderWithAuth(<LoginScreen />);
 
@@ -76,29 +82,12 @@ describe('acceso', () => {
     await authService.logout();
   });
 
-  it('el registro crea la cuenta y pide confirmar la contraseña', async () => {
-    mockRouter.replace.mockClear();
-    await renderWithAuth(<RegisterScreen />);
-
-    await fireEvent.changeText(screen.getByLabelText('Nombre'), 'María Pérez');
-    await fireEvent.changeText(screen.getByLabelText(/^Usuario/), 'maria');
-    await fireEvent.changeText(screen.getByLabelText(/^Contraseña/), 'secreta1');
-    await fireEvent.changeText(screen.getByLabelText('Repite la contraseña'), 'otra-cosa');
-    await press('Crear cuenta');
-    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeTruthy();
-
-    await fireEvent.changeText(screen.getByLabelText('Repite la contraseña'), 'secreta1');
-    await press('Crear cuenta');
-
-    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/'));
-  });
-
-  it('la cuenta recién creada ve "acceso pendiente" y no tiene rol', async () => {
-    // La sesión de "maria" quedó abierta por el registro anterior.
+  it('una cuenta sin rol ve "acceso pendiente" y no puede trabajar', async () => {
+    await signInAs('pendiente', 'pendiente123');
     await renderWithAuth(<PendingAccessScreen />);
 
     expect(await screen.findByText('Acceso pendiente')).toBeTruthy();
-    expect(screen.getByText(/Hola María Pérez/)).toBeTruthy();
+    expect(screen.getByText(/Hola Cuenta pendiente/)).toBeTruthy();
     expect(screen.getByText(/se actualiza sola/i)).toBeTruthy();
     await authService.logout();
   });
@@ -109,22 +98,22 @@ describe('administración', () => {
     await signInAs('admin', 'admin123');
     await renderWithAuth(<UsersScreen />);
 
-    expect(await screen.findByText('María Pérez')).toBeTruthy();
-    expect(screen.getByText(/cuentas esperan que le asignes un acceso/)).toBeTruthy();
+    expect(await screen.findByText('Cuenta pendiente')).toBeTruthy();
+    expect(screen.getByText(/1 cuenta espera que le asignes un acceso/)).toBeTruthy();
 
     // Las cuentas pendientes van primero; "Cocinero" del primer renglón.
     const [firstCookChip] = screen.getAllByRole('button', { name: /^Cocinero$/ });
     await fireEvent.press(firstCookChip);
 
-    await waitFor(() => expect(screen.queryByText(/esperan que le asignes un acceso/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/espera que le asignes un acceso/)).toBeNull());
   });
 
-  it('el inicio de administración avisa de cuentas pendientes', async () => {
+  it('el inicio de administración enlaza al menú y a los usuarios', async () => {
     await signInAs('admin', 'admin123');
     await renderWithAuth(<AdminScreen />);
 
-    // Queda "Cuenta pendiente" (la de ejemplo), que aún no tiene rol.
-    expect(await screen.findByText(/1 cuenta espera que le asignes un acceso/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Menú: platillos, bebidas y extras/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Usuarios y accesos/ })).toBeTruthy();
   });
 });
 
@@ -154,9 +143,16 @@ describe('flujo caja → cocina → entrega', () => {
     // 2 × 3.500 + 1 × 500 + 1 × 1.000
     expect(screen.getByText('₡8.500')).toBeTruthy();
 
+    // Sin nombre del cliente no se puede enviar.
+    expect(screen.getByText('Escribe el nombre del cliente para poder enviar el pedido.')).toBeTruthy();
+    expect(button('Enviar pedido a cocina').props.accessibilityState.disabled).toBe(true);
+
+    await fireEvent.changeText(screen.getByLabelText('Nombre del cliente *'), '  Ana   Mora ');
+    expect(button('Enviar pedido a cocina').props.accessibilityState.disabled).toBe(false);
+
     await press('Enviar pedido a cocina');
 
-    expect(await screen.findByText('Pedido #001 enviado a cocina.')).toBeTruthy();
+    expect(await screen.findByText('Pedido #001 de Ana Mora enviado a cocina.')).toBeTruthy();
     expect(screen.getByText('Agrega productos para poder enviar el pedido.')).toBeTruthy();
     expect(await orderService.listKitchenOrders()).toHaveLength(1);
   });
@@ -166,6 +162,7 @@ describe('flujo caja → cocina → entrega', () => {
     await renderWithAuth(<KitchenScreen />);
 
     expect(await screen.findByText('#001')).toBeTruthy();
+    expect(screen.getByText('Ana Mora')).toBeTruthy(); // nombre del cliente en la tarjeta
     expect(screen.getByText('2 × Hamburguesa clásica')).toBeTruthy();
     expect(screen.getByText('+ 1 × Queso extra')).toBeTruthy();
     expect(screen.getByText('• Sin cebolla')).toBeTruthy();
@@ -184,6 +181,7 @@ describe('flujo caja → cocina → entrega', () => {
     await waitFor(() => expect(button('Listos (1)')).toBeTruthy());
     await press('Listos (1)');
     expect(await screen.findByText('Listos para entregar')).toBeTruthy();
+    expect(screen.getByText('Ana Mora')).toBeTruthy();
 
     await press('Marcar como entregado');
 

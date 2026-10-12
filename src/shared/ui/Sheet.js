@@ -11,13 +11,14 @@ import { Text } from './Text';
  * @param {string} props.title
  * @param {() => void} props.onClose
  * @param {import('react').ReactNode} [props.footer]  zona fija inferior (botones)
+ * @param {string} [props.testID]
  */
-export function Sheet({ visible, title, onClose, footer, children }) {
+export function Sheet({ visible, title, onClose, footer, testID, children }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar" />
-        <View style={styles.sheet}>
+        <View style={styles.sheet} testID={testID}>
           <View style={styles.header}>
             <Text variant="title" style={styles.title}>
               {title}

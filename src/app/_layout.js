@@ -10,7 +10,7 @@ import { Spinner } from '@/shared/ui';
  * Qué pantallas existen para cada estado de sesión. El usuario no elige su
  * rol: lo que ve depende del acceso que le asignó el administrador.
  *
- *   sin sesión        → login, registro
+ *   sin sesión        → login (y el enlace de invitación, que siempre existe)
  *   sin rol asignado  → pendiente
  *   con rol           → solo las zonas que su rol permite
  */
@@ -31,7 +31,6 @@ function AppStack() {
     >
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" />
-        <Stack.Screen name="registro" />
       </Stack.Protected>
 
       <Stack.Protected guard={signedIn && !hasAccess(user)}>

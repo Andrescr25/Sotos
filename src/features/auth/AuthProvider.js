@@ -64,8 +64,12 @@ export function AuthProvider({ children, service = defaultAuthService }) {
         return user;
       },
 
-      async register(input) {
-        const user = await service.register(input);
+      /** Datos de la cuenta a la que pertenece un enlace de invitación. */
+      getInvitation: (token) => service.getInvitation(token),
+
+      /** El empleado crea su contraseña con el enlace y queda con la sesión abierta. */
+      async acceptInvitation(token, password) {
+        const user = await service.acceptInvitation(token, password);
         setState({ status: 'signedIn', user, error: null });
         return user;
       },

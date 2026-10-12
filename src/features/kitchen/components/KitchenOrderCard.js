@@ -48,6 +48,12 @@ export function KitchenOrderCard({ order, now, action, hint, busy = false, onAct
         </View>
       </View>
 
+      {order.customerName ? (
+        <Text variant="title" style={styles.customer}>
+          {order.customerName}
+        </Text>
+      ) : null}
+
       <View style={commonStyles.rowBetween}>
         <Text color="textSecondary">{sentAt ? formatClockTime(sentAt) : ''}</Text>
         <Text variant="caption" color="textSecondary">
@@ -100,6 +106,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.radius.pill,
   },
+  customer: { fontWeight: theme.fontWeights.bold },
   action: { minHeight: 64 },
   hint: { textAlign: 'center' },
 });

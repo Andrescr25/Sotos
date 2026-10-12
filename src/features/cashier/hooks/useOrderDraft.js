@@ -5,6 +5,7 @@ import {
   removeItem,
   setItemNotes,
   setItemQuantity,
+  setCustomerName,
   setOrderNote,
 } from '@/domain/orders';
 
@@ -25,6 +26,8 @@ function reducer(order, action) {
         return removeItem(order, action.itemId);
       case 'setNote':
         return setOrderNote(order, action.note);
+      case 'setCustomerName':
+        return setCustomerName(order, action.name);
       case 'reset':
         return createDraftOrder({ createdBy: action.user });
       default:
@@ -50,6 +53,7 @@ export function useOrderDraft(user) {
     setNotes: useCallback((itemId, notes) => dispatch({ type: 'setNotes', itemId, notes }), []),
     remove: useCallback((itemId) => dispatch({ type: 'remove', itemId }), []),
     setNote: useCallback((note) => dispatch({ type: 'setNote', note }), []),
+    setCustomerName: useCallback((name) => dispatch({ type: 'setCustomerName', name }), []),
     /** Empieza un pedido nuevo (con otro id) después de enviar. */
     reset: useCallback(() => dispatch({ type: 'reset', user }), [user]),
   };

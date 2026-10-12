@@ -16,6 +16,7 @@ import {
   removeItem,
   sendOrderToKitchen,
   setItemNotes,
+  setCustomerName,
   setItemQuantity,
   setOrderNote,
 } from '@/domain/orders';
@@ -41,6 +42,7 @@ function expectOrderError(fn, code) {
 /** El pedido del enunciado: 2 hamburguesas (1 con queso extra, sin cebolla), 2 Coca-Cola, 1 papas. */
 function buildExampleOrder() {
   let order = createDraftOrder({ createdBy: cashier, now: T0 });
+  order = setCustomerName(order, 'María Pérez', T0);
   order = addItem(
     order,
     createOrderItem({
@@ -202,6 +204,55 @@ describe('líneas del pedido', () => {
 
     expect(order.items).toBe(itemsBefore);
     expect(order.items[0].quantity).toBe(2);
+  });
+});
+
+describe('nombre del cliente (obligatorio)', () => {
+  it('un borrador nuevo no tiene nombre', () => {
+    expect(createDraftOrder({ createdBy: cashier, now: T0 }).customerName).toBe('');
+  });
+
+  it('se limpia: sin espacios sobrantes ni dobles', () => {
+    const order = setCustomerName(createDraftOrder({ createdBy: cashier, now: T0 }), '   María    Pérez  ', T0);
+    expect(order.customerName).toBe('María Pérez');
+  });
+
+  it('no se puede enviar sin nombre, ni con uno que no sea un nombre', () => {
+    let order = addItem(
+      createDraftOrder({ createdBy: cashier, now: T0 }),
+      createOrderItem({ product: product('prod-papas') }),
+      T0,
+    );
+
+    expectOrderError(
+      () => sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }),
+      ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+    );
+
+    for (const invalid of ['   ', 'A', '...', '12', '--']) {
+      order = setCustomerName(order, invalid, T0);
+      expectOrderError(
+        () => sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }),
+        ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+      );
+    }
+  });
+
+  it('acepta nombres reales: con tildes, iniciales o "Mesa 5"', () => {
+    for (const valid of ['Ana', 'José Ángel', 'Ana M.', 'Mesa 5', 'Jo']) {
+      let order = addItem(
+        createDraftOrder({ createdBy: cashier, now: T0 }),
+        createOrderItem({ product: product('prod-papas') }),
+        T0,
+      );
+      order = setCustomerName(order, valid, T0);
+      expect(sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }).customerName).toBe(valid);
+    }
+  });
+
+  it('no se puede cambiar una vez enviado', () => {
+    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    expectOrderError(() => setCustomerName(sent, 'Otro', T0), ORDER_ERROR.NOT_EDITABLE);
   });
 });
 

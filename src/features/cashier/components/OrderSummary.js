@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { calculateItemTotal } from '@/domain/orders';
+import { calculateItemTotal, isValidCustomerName } from '@/domain/orders';
 import { commonStyles } from '@/shared/styles/commonStyles';
 import { theme } from '@/shared/theme';
 import { formatColones } from '@/shared/utils/money';
@@ -16,10 +16,21 @@ import { Banner, Button, Icon, Stepper, Text, TextField } from '@/shared/ui';
  * @param {(itemId: string) => void} props.onEditNotes
  * @param {(itemId: string) => void} props.onRemove
  * @param {(note: string) => void} props.onNoteChange
+ * @param {(name: string) => void} props.onCustomerChange  nombre del cliente (obligatorio)
  * @param {() => void} props.onSend
  */
-export function OrderSummary({ order, sending, onQuantity, onEditNotes, onRemove, onNoteChange, onSend }) {
+export function OrderSummary({
+  order,
+  sending,
+  onQuantity,
+  onEditNotes,
+  onRemove,
+  onNoteChange,
+  onCustomerChange,
+  onSend,
+}) {
   const empty = order.items.length === 0;
+  const hasName = isValidCustomerName(order.customerName);
 
   return (
     <View style={[commonStyles.card, styles.panel]}>
@@ -27,6 +38,15 @@ export function OrderSummary({ order, sending, onQuantity, onEditNotes, onRemove
         <Text variant="title">Pedido actual</Text>
         <Text color="textSecondary">{order.totals.itemCount} unidades</Text>
       </View>
+
+      <TextField
+        label="Nombre del cliente *"
+        value={order.customerName}
+        onChangeText={onCustomerChange}
+        autoCapitalize="words"
+        placeholder="¿A nombre de quién va la cuenta?"
+        error={!hasName && !empty ? 'Obligatorio para enviar el pedido' : undefined}
+      />
 
       {empty ? (
         <View style={styles.empty}>
@@ -98,12 +118,15 @@ export function OrderSummary({ order, sending, onQuantity, onEditNotes, onRemove
       </View>
 
       {empty ? <Banner tone="info" message="Agrega productos para poder enviar el pedido." /> : null}
+      {!empty && !hasName ? (
+        <Banner tone="warning" message="Escribe el nombre del cliente para poder enviar el pedido." />
+      ) : null}
 
       <Button
         icon="send"
         label={sending ? 'Enviando…' : 'Enviar pedido a cocina'}
         onPress={onSend}
-        disabled={empty || sending}
+        disabled={empty || !hasName || sending}
         style={styles.send}
       />
     </View>

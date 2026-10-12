@@ -7,8 +7,8 @@ import { Banner, Button, Screen, Text } from '@/shared/ui';
 import { useUsers } from '../hooks/useUsers';
 
 /**
- * Inicio del administrador: gestión de accesos y atajos a las demás zonas
- * (el administrador tiene acceso total). Productos, reportes y configuración
+ * Inicio del administrador: menú, gestión de accesos y atajos a las demás
+ * zonas (el administrador tiene acceso total). Reportes y configuración
  * llegarán en etapas posteriores.
  */
 export default function AdminScreen() {
@@ -30,6 +30,11 @@ export default function AdminScreen() {
       ) : null}
 
       <View style={styles.actions}>
+        <Button
+          icon="restaurant"
+          label="Menú: platillos, bebidas y extras"
+          onPress={() => router.push('/admin/menu')}
+        />
         <Button
           icon="people"
           label={pendingCount > 0 ? `Usuarios y accesos (${pendingCount} pendientes)` : 'Usuarios y accesos'}

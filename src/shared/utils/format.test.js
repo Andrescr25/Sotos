@@ -1,4 +1,4 @@
-import { formatColones } from './money';
+import { formatColones, parseColones } from './money';
 import { formatClockTime, formatElapsed } from './time';
 
 describe('formatColones', () => {
@@ -28,5 +28,27 @@ describe('formatElapsed', () => {
     expect(formatElapsed(65_000)).toBe('01:05');
     expect(formatElapsed(3_725_000)).toBe('1:02:05');
     expect(formatElapsed(-10)).toBe('00:00');
+  });
+});
+
+describe('parseColones', () => {
+  it('lee montos escritos de varias formas', () => {
+    expect(parseColones('3500')).toBe(3500);
+    expect(parseColones('3.500')).toBe(3500);
+    expect(parseColones('₡ 3 500')).toBe(3500);
+    expect(parseColones('0')).toBe(0);
+  });
+
+  it('rechaza vacío, decimales y texto', () => {
+    expect(parseColones('')).toBeNull();
+    expect(parseColones('   ')).toBeNull();
+    expect(parseColones('12,5')).toBeNull();
+    expect(parseColones('abc')).toBeNull();
+    expect(parseColones('-5')).toBeNull();
+    expect(parseColones(undefined)).toBeNull();
+  });
+
+  it('es la inversa de formatColones', () => {
+    expect(parseColones(formatColones(1250000))).toBe(1250000);
   });
 });

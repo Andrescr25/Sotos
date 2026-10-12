@@ -5,6 +5,7 @@
   "dependencies": {
     "@react-native-vector-icons/ionicons": "^13.1.5",
     "expo": "~57.0.28",
+    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.21",
     "expo-font": "~57.0.4",
     "expo-linking": "~57.0.12",

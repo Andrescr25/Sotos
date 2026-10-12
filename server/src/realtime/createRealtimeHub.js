@@ -12,6 +12,7 @@ import { PERMISSIONS, can } from '@/domain/users';
  *   servidor -> { type: 'order:saved', order } solo a quien puede ver pedidos
  *   servidor -> { type: 'user:updated', user } a la persona afectada (rol o estado cambió)
  *   servidor -> { type: 'users:changed' }      a los administradores (alta o cambio de cuentas)
+ *   servidor -> { type: 'menu:changed' }       a quien puede ver el menú (el administrador lo editó)
  *
  * Una cuenta sin rol puede conectarse (para enterarse al instante cuando el
  * administrador le da acceso) pero no recibe pedidos.
@@ -126,6 +127,21 @@ export function createRealtimeHub({ authenticate, heartbeatMs = 25_000, authTime
         send(socket, { type: 'user:updated', user });
         if (!user.active) socket.close(4403, 'disabled');
       });
+    },
+
+    /**
+     * Cierra todas las conexiones de una cuenta (por ejemplo, tras cambiar su
+     * contraseña): los dispositivos con la sesión anterior vuelven al login.
+     */
+    disconnectUser(userId) {
+      authenticated.forEach((socket) => {
+        if (socket.user.id === userId) socket.close(4401, 'session replaced');
+      });
+    },
+
+    /** El administrador cambió el menú: caja y administración lo recargan. */
+    broadcastMenuChanged() {
+      sendWhere((user) => can(user.role, PERMISSIONS.MENU_VIEW), { type: 'menu:changed' });
     },
 
     /** Hubo un alta o un cambio de cuentas: los administradores recargan su lista. */

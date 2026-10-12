@@ -62,11 +62,15 @@ export const USER_SCHEMA = [
      id            text PRIMARY KEY,
      username      text NOT NULL UNIQUE,
      name          text NOT NULL,
-     password_hash text NOT NULL,
+     password_hash text,
      role          text,
      active        boolean NOT NULL DEFAULT true,
      created_at    timestamptz NOT NULL
    )`,
+  // Cuentas invitadas por el administrador todavía no tienen contraseña:
+  // password_hash queda NULL hasta que el empleado abre su enlace. Esta
+  // sentencia actualiza bases creadas antes de existir las invitaciones.
+  `ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`,
   // Solo se guarda el hash del token de sesión.
   `CREATE TABLE IF NOT EXISTS sessions (
      token_hash text PRIMARY KEY,
@@ -75,6 +79,32 @@ export const USER_SCHEMA = [
      expires_at timestamptz NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id)`,
+  // Enlaces de invitación / de restablecer contraseña: de un solo uso. Solo se
+  // guarda el hash del token; el enlace completo se muestra una vez al admin.
+  `CREATE TABLE IF NOT EXISTS invitations (
+     token_hash    text PRIMARY KEY,
+     user_id       text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     created_by_id text,
+     created_at    timestamptz NOT NULL,
+     expires_at    timestamptz NOT NULL,
+     used_at       timestamptz
+   )`,
+  `CREATE INDEX IF NOT EXISTS invitations_user_idx ON invitations (user_id)`,
   ...lockDown('users'),
   ...lockDown('sessions'),
+  ...lockDown('invitations'),
+];
+
+/**
+ * El menú completo vive en un solo documento JSONB. Es pequeño (decenas o
+ * cientos de productos), y así cada cambio del administrador es atómico y se
+ * valida con las mismas funciones puras del dominio.
+ */
+export const MENU_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS menu_documents (
+     id         text PRIMARY KEY,
+     data       jsonb NOT NULL,
+     updated_at timestamptz NOT NULL DEFAULT now()
+   )`,
+  ...lockDown('menu_documents'),
 ];

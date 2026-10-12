@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { ORDER_SCHEMA, USER_SCHEMA } from '../store/schema';
+import { MENU_SCHEMA, ORDER_SCHEMA, USER_SCHEMA } from '../store/schema';
 import {
   describeDatabaseUrl,
   explainConnectionError,
@@ -70,7 +70,7 @@ describe('inspectDatabase', () => {
     const before = await inspectDatabase(db);
     expect(before.tables.every((table) => !table.exists)).toBe(true);
 
-    for (const statement of [...USER_SCHEMA, ...ORDER_SCHEMA]) await db.query(statement);
+    for (const statement of [...USER_SCHEMA, ...ORDER_SCHEMA, ...MENU_SCHEMA]) await db.query(statement);
 
     const after = await inspectDatabase(db);
     expect(after.currentUser).toBeTruthy();
@@ -79,6 +79,8 @@ describe('inspectDatabase', () => {
       { name: 'order_counters', exists: true, rls: true },
       { name: 'users', exists: true, rls: true },
       { name: 'sessions', exists: true, rls: true },
+      { name: 'invitations', exists: true, rls: true },
+      { name: 'menu_documents', exists: true, rls: true },
     ]);
     await db.close();
   });

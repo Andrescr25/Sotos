@@ -27,6 +27,9 @@ export function ReadyOrdersSheet({ orders, busyId, onDeliver, onClose }) {
               <Text variant="headline">{formatOrderNumber(order.number)}</Text>
               <Text color="textSecondary">{formatClockTime(order.createdAt)}</Text>
             </View>
+            {order.customerName ? (
+              <Text variant="title">{order.customerName}</Text>
+            ) : null}
             <OrderItemsList items={order.items} />
             <Button
               icon="bag-check"

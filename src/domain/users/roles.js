@@ -32,5 +32,6 @@ export function isRole(value) {
  * @property {string} name  nombre para mostrar
  * @property {'cashier' | 'cook' | 'admin' | null} role  null = sin acceso asignado todavía
  * @property {boolean} active  false = cuenta deshabilitada, no puede entrar
+ * @property {boolean} passwordSet  false = invitada: todavía no creó su contraseña
  * @property {string} createdAt  fecha ISO
  */

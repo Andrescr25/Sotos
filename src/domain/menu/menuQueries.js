@@ -11,6 +11,17 @@ export function getActiveCategories(menu) {
 }
 
 /**
+ * Categorías que el cajero debe ver: activas y con al menos un producto activo
+ * (una categoría vacía solo estorba al tomar pedidos).
+ * @param {import('./types').Menu} menu
+ */
+export function getSellableCategories(menu) {
+  return getActiveCategories(menu).filter((category) =>
+    menu.products.some((product) => product.active && product.categoryId === category.id),
+  );
+}
+
+/**
  * @param {import('./types').Menu} menu
  * @param {string} categoryId
  */

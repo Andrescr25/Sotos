@@ -11,6 +11,11 @@ export {
 export { createOrderItem, getItemKey } from './orderItem';
 export { calculateItemTotal, calculateOrderTotals } from './pricing';
 export { formatOrderNumber } from './orderNumber';
+export {
+  CUSTOMER_NAME_MAX_LENGTH,
+  cleanCustomerName,
+  isValidCustomerName,
+} from './customerName';
 export { checkOrderWrite, checkOrderActor } from './orderIntegrity';
 export {
   createDraftOrder,
@@ -19,6 +24,7 @@ export {
   setItemNotes,
   removeItem,
   setOrderNote,
+  setCustomerName,
   changeOrderStatus,
   sendOrderToKitchen,
   getStatusTime,

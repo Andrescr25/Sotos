@@ -73,5 +73,31 @@ export function useUsers({ service = defaultUserService } = {}) {
     reload: load,
     assignRole: (id, role) => change(id, () => service.assignRole(id, role)),
     setActive: (id, active) => change(id, () => service.setActive(id, active)),
+
+    /**
+     * Crea la cuenta de un empleado y devuelve `{ ok, result: { user, invitation } }`
+     * o `{ ok: false, error }` (los errores de validación los muestra el formulario).
+     */
+    async createAccount(input) {
+      try {
+        const result = await service.createAccount(input);
+        await load();
+        return { ok: true, result };
+      } catch (caught) {
+        return { ok: false, error: caught };
+      }
+    },
+
+    /** Enlace nuevo para una cuenta existente (invitación perdida o contraseña olvidada). */
+    async createInvitation(userId) {
+      try {
+        const result = await service.createInvitation(userId);
+        await load();
+        return { ok: true, result };
+      } catch (caught) {
+        setError(caught);
+        return { ok: false, error: caught };
+      }
+    },
   };
 }

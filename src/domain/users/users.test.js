@@ -10,7 +10,9 @@ import {
   getHomeArea,
   hasAccess,
   normalizeUsername,
-  validateRegistration,
+  suggestUsername,
+  validateNewAccount,
+  validatePassword,
 } from '@/domain/users';
 
 const [cashier, cook, admin, pending] = usersSeed;
@@ -58,23 +60,8 @@ describe('permisos y acceso por rol', () => {
   });
 });
 
-describe('validateRegistration', () => {
-  it('limpia nombre y usuario', () => {
-    expect(
-      validateRegistration({ name: '  María   Pérez ', username: ' MPerez ', password: 'secreta1' }),
-    ).toEqual({ name: 'María Pérez', username: 'mperez', password: 'secreta1' });
-  });
-
-  it('rechaza datos inválidos con el código correspondiente', () => {
-    const ok = { name: 'Ana', username: 'ana', password: 'secreta1' };
-    expectUserError(() => validateRegistration({ ...ok, name: 'A' }), USER_ERROR.INVALID_NAME);
-    expectUserError(() => validateRegistration({ ...ok, username: 'a b' }), USER_ERROR.INVALID_USERNAME);
-    expectUserError(() => validateRegistration({ ...ok, username: 'ab' }), USER_ERROR.INVALID_USERNAME);
-    expectUserError(() => validateRegistration({ ...ok, password: '12345' }), USER_ERROR.INVALID_PASSWORD);
-    expectUserError(() => validateRegistration(null), USER_ERROR.INVALID_NAME);
-  });
-
-  it('normalizeUsername pasa a minúsculas y recorta', () => {
+describe('normalizeUsername', () => {
+  it('pasa a minúsculas y recorta', () => {
     expect(normalizeUsername('  Cajero1 ')).toBe('cajero1');
   });
 });
@@ -103,5 +90,50 @@ describe('applyAccessChange', () => {
   it('con otro administrador activo sí se puede cambiar al primero', () => {
     const withSecondAdmin = [...publicUsers, { ...cook, id: 'u2', username: 'otro', role: ROLES.ADMIN }];
     expect(applyAccessChange(withSecondAdmin, admin.id, { role: ROLES.CASHIER }).role).toBe(ROLES.CASHIER);
+  });
+});
+
+describe('validateNewAccount (el admin invita a un empleado)', () => {
+  it('limpia nombre y usuario, y acepta un rol o ninguno', () => {
+    expect(
+      validateNewAccount({ name: '  María   Pérez ', username: ' MPerez ', role: ROLES.CASHIER }),
+    ).toEqual({ name: 'María Pérez', username: 'mperez', role: ROLES.CASHIER });
+
+    expect(validateNewAccount({ name: 'Luis Rojas', username: 'luis' }).role).toBeNull();
+    expect(validateNewAccount({ name: 'Luis Rojas', username: 'luis', role: null }).role).toBeNull();
+  });
+
+  it('no pide contraseña: la crea el empleado', () => {
+    expect(() => validateNewAccount({ name: 'Ana', username: 'ana' })).not.toThrow();
+  });
+
+  it('rechaza datos inválidos', () => {
+    const ok = { name: 'Ana', username: 'ana' };
+    expectUserError(() => validateNewAccount({ ...ok, name: 'A' }), USER_ERROR.INVALID_NAME);
+    expectUserError(() => validateNewAccount({ ...ok, username: 'a b' }), USER_ERROR.INVALID_USERNAME);
+    expectUserError(() => validateNewAccount({ ...ok, role: 'dueño' }), USER_ERROR.INVALID_ROLE);
+  });
+});
+
+describe('validatePassword', () => {
+  it('exige longitud mínima', () => {
+    expect(validatePassword('secreta1')).toBe('secreta1');
+    expectUserError(() => validatePassword('12345'), USER_ERROR.INVALID_PASSWORD);
+    expectUserError(() => validatePassword(undefined), USER_ERROR.INVALID_PASSWORD);
+  });
+});
+
+describe('suggestUsername', () => {
+  it('arma un usuario válido a partir del nombre', () => {
+    expect(suggestUsername('María Pérez')).toBe('maria.perez');
+    expect(suggestUsername('  José   Ángel  Núñez ')).toBe('jose.angel.nunez');
+    expect(suggestUsername("O'Brien-Smith")).toBe('obrien-smith');
+    expect(suggestUsername('')).toBe('');
+    expect(suggestUsername('x'.repeat(50)).length).toBe(30);
+  });
+
+  it('lo sugerido pasa la validación de usuario', () => {
+    const username = suggestUsername('María del Carmen Rodríguez');
+    expect(() => validateNewAccount({ name: 'María', username })).not.toThrow();
   });
 });

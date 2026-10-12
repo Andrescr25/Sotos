@@ -8,6 +8,7 @@ import {
   addItem,
   createDraftOrder,
   createOrderItem,
+  setCustomerName,
 } from '@/domain/orders';
 import { createOrderService } from './orderService';
 
@@ -22,7 +23,7 @@ function setup(startDate = new Date('2026-10-12T12:00:00')) {
 }
 
 function draftWithOneItem() {
-  const order = createDraftOrder({ createdBy: cashier });
+  const order = setCustomerName(createDraftOrder({ createdBy: cashier }), 'María Pérez');
   const item = createOrderItem({ product: findProduct(menuSeed, 'prod-papas'), quantity: 1 });
   return addItem(order, item);
 }

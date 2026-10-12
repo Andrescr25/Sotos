@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { getActiveCategories, getExtrasForProduct, getProductsByCategory } from '@/domain/menu';
+import { getExtrasForProduct, getProductsByCategory, getSellableCategories } from '@/domain/menu';
 import { ORDER_STATUS, createOrderItem, formatOrderNumber } from '@/domain/orders';
 import { SessionBar, useAuth } from '@/features/auth';
+import { useMenu } from '@/features/menu/useMenu';
 import { useLiveOrders } from '@/features/orders/useLiveOrders';
+import { PERMISSIONS, can } from '@/domain/users';
 import { orderService } from '@/services';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { commonStyles } from '@/shared/styles/commonStyles';
@@ -15,7 +17,6 @@ import { OrderSummary } from '../components/OrderSummary';
 import { ProductGrid } from '../components/ProductGrid';
 import { ProductOptionsSheet } from '../components/ProductOptionsSheet';
 import { ReadyOrdersSheet } from '../components/ReadyOrdersSheet';
-import { useMenu } from '../hooks/useMenu';
 import { useOrderDraft } from '../hooks/useOrderDraft';
 
 const WIDE_BREAKPOINT = 900;
@@ -53,7 +54,7 @@ function CashierWorkspace({ user }) {
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
 
-  const categories = useMemo(() => (menu ? getActiveCategories(menu) : []), [menu]);
+  const categories = useMemo(() => (menu ? getSellableCategories(menu) : []), [menu]);
   const activeCategoryId = categoryId ?? categories[0]?.id ?? null;
   const products = useMemo(
     () => (menu && activeCategoryId ? getProductsByCategory(menu, activeCategoryId) : []),
@@ -85,7 +86,7 @@ function CashierWorkspace({ user }) {
     setNotice(null);
     try {
       const sent = await orderService.sendToKitchen(draft.order, user);
-      setNotice(`Pedido ${formatOrderNumber(sent.number)} enviado a cocina.`);
+      setNotice(`Pedido ${formatOrderNumber(sent.number)} de ${sent.customerName} enviado a cocina.`);
       draft.reset();
     } catch (caught) {
       // El borrador se conserva: se puede reintentar sin volver a armarlo.
@@ -118,6 +119,7 @@ function CashierWorkspace({ user }) {
       onEditNotes={setNotesItemId}
       onRemove={draft.remove}
       onNoteChange={draft.setNote}
+      onCustomerChange={draft.setCustomerName}
       onSend={send}
     />
   );
@@ -154,6 +156,18 @@ function CashierWorkspace({ user }) {
 
       {loading ? (
         <Spinner message="Cargando menú…" />
+      ) : categories.length === 0 ? (
+        <View style={[commonStyles.card, styles.emptyMenu]}>
+          <Text variant="title">Aún no hay productos en el menú</Text>
+          <Text color="textSecondary" style={styles.emptyMenuText}>
+            {can(user.role, PERMISSIONS.MENU_MANAGE)
+              ? 'Agrega tus platillos y bebidas para empezar a tomar pedidos.'
+              : 'Pide al administrador que agregue los platillos y bebidas.'}
+          </Text>
+          {can(user.role, PERMISSIONS.MENU_MANAGE) ? (
+            <Button icon="restaurant" label="Ir al menú" onPress={() => router.push('/admin/menu')} />
+          ) : null}
+        </View>
       ) : (
         <View style={[styles.body, !wide && styles.bodyNarrow]}>
           <View style={styles.catalog}>
@@ -224,6 +238,8 @@ const styles = StyleSheet.create({
   catalog: { flex: 1, gap: theme.spacing.md },
   categories: { flexGrow: 0 },
   categoriesContent: { gap: theme.spacing.sm },
+  emptyMenu: { alignItems: 'center', gap: theme.spacing.md, alignSelf: 'center', maxWidth: 520 },
+  emptyMenuText: { textAlign: 'center' },
   summaryWide: { width: 400 },
   summaryNarrow: { flex: 1, minHeight: 320 },
 });

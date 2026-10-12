@@ -11,6 +11,18 @@ export function createUserService({ userRepository }) {
     /** Asigna el rol; `null` quita el acceso. */
     assignRole: (userId, role) => userRepository.setAccess(userId, { role }),
 
+    /**
+     * Crea la cuenta de un empleado y devuelve su enlace de invitación (un solo
+     * uso). El empleado lo abre y crea su contraseña; entra con el rol dado.
+     */
+    createAccount: (input) => userRepository.createAccount(input),
+
+    /**
+     * Enlace nuevo para una cuenta existente: invitación perdida o contraseña
+     * olvidada. El enlace anterior deja de servir.
+     */
+    createInvitation: (userId) => userRepository.createInvitation(userId),
+
     /** Habilita o deshabilita la cuenta (deshabilitada no puede entrar). */
     setActive: (userId, active) => userRepository.setAccess(userId, { active }),
 
