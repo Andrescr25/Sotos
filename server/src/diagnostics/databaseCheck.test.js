@@ -1,6 +1,11 @@
 import { PGlite } from '@electric-sql/pglite';
 import { ORDER_SCHEMA, USER_SCHEMA } from '../store/schema';
-import { describeDatabaseUrl, explainConnectionError, inspectDatabase } from './databaseCheck';
+import {
+  describeDatabaseUrl,
+  explainConnectionError,
+  inspectDatabase,
+  isDatabaseError,
+} from './databaseCheck';
 
 const SECRET = 'S3cr3t-NoDebeAparecer';
 const POOLER = `postgresql://postgres.abcdefghijkl:${SECRET}@aws-0-us-east-2.pooler.supabase.com:5432/postgres`;
@@ -45,6 +50,16 @@ describe('explainConnectionError', () => {
   it('nunca incluye datos de la conexión en el mensaje genérico', () => {
     const text = explainConnectionError(new Error('algo raro'));
     expect(text).toBe('No se pudo conectar: algo raro');
+  });
+});
+
+describe('isDatabaseError', () => {
+  it('reconoce errores de Postgres y de red, pero no los de configuración', () => {
+    expect(isDatabaseError({ code: '28P01' })).toBe(true);
+    expect(isDatabaseError({ code: 'ENOTFOUND' })).toBe(true);
+    expect(isDatabaseError({ code: 'ECONNREFUSED' })).toBe(true);
+    expect(isDatabaseError(new Error('DATABASE_URL es obligatoria'))).toBe(false);
+    expect(isDatabaseError(null)).toBe(false);
   });
 });
 

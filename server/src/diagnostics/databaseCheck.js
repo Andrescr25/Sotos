@@ -39,6 +39,18 @@ export function describeDatabaseUrl(databaseUrl) {
 }
 
 /**
+ * ¿Parece un error de la base de datos o de la red (y no, por ejemplo, de
+ * configuración)? Los de Postgres traen un código SQLSTATE de 5 caracteres y
+ * los de red un código tipo ENOTFOUND.
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isDatabaseError(error) {
+  const code = error && typeof error === 'object' ? error.code : undefined;
+  return typeof code === 'string' && (/^[0-9A-Z]{5}$/.test(code) || /^E[A-Z]{3,}$/.test(code));
+}
+
+/**
  * Traduce un error de conexión a una explicación accionable en español.
  * @param {{ code?: string, message?: string }} error
  * @returns {string}
@@ -48,7 +60,7 @@ export function explainConnectionError(error) {
   const message = String(error?.message ?? '');
 
   if (code === '28P01' || /password authentication failed/i.test(message)) {
-    return 'La contraseña es incorrecta. Revísala (o restablécela en Supabase → Database → Settings) y, si tiene caracteres especiales (@ # / ? :), codifícalos en la URL (%40, %23, %2F…).';
+    return 'La contraseña es incorrecta. Revisa que en DATABASE_URL sea EXACTAMENTE la de la base de datos (sin comillas, espacios ni saltos de línea). Si dudas, restablécela en Supabase → Database → Settings; y si tiene caracteres especiales (@ # / ? :), codifícalos en la URL (%40, %23, %2F…).';
   }
   if (/tenant or user not found/i.test(message) || code === 'XX000') {
     return 'Supabase no reconoce el usuario. En el Session pooler el usuario es "postgres.<ref-del-proyecto>" (no solo "postgres"). Copia la cadena tal cual desde Connect → Session pooler.';

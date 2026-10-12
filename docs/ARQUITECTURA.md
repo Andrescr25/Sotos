@@ -347,7 +347,7 @@ cuenta con rol asignado por el administrador.
 
 ```bash
 npm start               # app (Expo)
-npm run web             # app en el navegador (necesita CORS_ORIGIN en el servidor)
+npm run web             # app en el navegador (el servidor acepta localhost por CORS)
 npm test                # pruebas de app y servidor
 npm run test:watch
 npm run server:install  # instalar dependencias del servidor (una vez)

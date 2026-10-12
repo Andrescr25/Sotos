@@ -2,6 +2,7 @@ import http from 'node:http';
 import { AppError, COMMON_ERROR } from '@/shared/errors/AppError';
 import { createAuthService } from './auth/createAuthService';
 import { createAuthRoutes } from './http/authRoutes';
+import { resolveCorsOrigin } from './http/cors';
 import { createRateLimiter } from './http/createRateLimiter';
 import { HttpError, getBearerToken, sendJson, statusForCode } from './http/httpUtils';
 import { createOrderRoutes } from './http/orderRoutes';
@@ -18,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @param {Object} deps
  * @param {import('./store/contracts').OrderStore} deps.orderStore
  * @param {import('./store/contracts').UserStore} deps.userStore
- * @param {{ timeZone: string, sessionTtlDays?: number, corsOrigin?: string | null, loginRateLimit?: { max: number, windowMs: number } }} deps.config
+ * @param {{ timeZone: string, sessionTtlDays?: number, corsOrigins?: string[], loginRateLimit?: { max: number, windowMs: number } }} deps.config
  * @param {() => Date} [deps.now]
  * @param {number} [deps.heartbeatMs]
  */
@@ -40,26 +41,45 @@ export function createApp({ orderStore, userStore, config, now = () => new Date(
     ...createOrderRoutes({ orderStore, hub, timeZone: config.timeZone, now }),
   ];
 
-  /** CORS solo si se configuró (desarrollo con la app en el navegador). */
-  function applyCors(res) {
-    if (!config.corsOrigin) return;
-    res.setHeader('Access-Control-Allow-Origin', config.corsOrigin);
+  /**
+   * CORS para la app en el navegador. Devuelve si el origen está permitido.
+   * (Las apps nativas no envían `Origin` y no pasan por aquí.)
+   */
+  function applyCors(req, res) {
+    const allowOrigin = resolveCorsOrigin(req.headers.origin, config.corsOrigins);
+    if (!allowOrigin) return false;
+
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '600');
+    return true;
   }
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
-    applyCors(res);
+    const corsAllowed = applyCors(req, res);
 
     if (req.method === 'OPTIONS') {
-      res.writeHead(config.corsOrigin ? 204 : 404);
+      res.writeHead(corsAllowed ? 204 : 404);
       return res.end();
     }
 
     // Render usa esta ruta para saber si el servicio está vivo.
     if (req.method === 'GET' && url.pathname === '/health') {
       return sendJson(res, 200, { status: 'ok' });
+    }
+
+    // Quien abra la URL en un navegador ve que el servidor está vivo, en vez
+    // de un error. La app de las tablets no se sirve desde aquí.
+    if (req.method === 'GET' && url.pathname === '/') {
+      return sendJson(res, 200, {
+        service: 'sotos-server',
+        status: 'ok',
+        message: 'Servidor de pedidos activo. Esta dirección es la API: se usa desde la app de las tablets.',
+        health: '/health',
+      });
     }
 
     const route = routes.find(

@@ -166,6 +166,7 @@ disabled" para estas tablas.
 | `DATABASE_SSL_CA` | no | Certificado raíz de Supabase (PEM) para **verificar** al servidor |
 | `DATABASE_SSL` | no | `true`/`false`. Por defecto activo salvo en localhost |
 | `SESSION_TTL_DAYS` | no | Duración de una sesión (30) |
+| `CORS_ORIGIN` | no | Orígenes web extra permitidos (coma) o `*`. `localhost` siempre se permite |
 
 La conexión siempre va **cifrada**. Sin `DATABASE_SSL_CA` no se verifica la
 identidad del servidor de base de datos; para endurecerlo, descarga el
@@ -186,9 +187,11 @@ En memoria el servidor crea cuentas de ejemplo (`admin/admin123`,
 En `.env.local` pon la IP de tu computadora (no `localhost`, que sería la
 propia tablet): `EXPO_PUBLIC_API_URL=http://192.168.1.50:10000`.
 
-Para probar con la app en el **navegador** (`npm run web`) el servidor debe
-permitir CORS: `CORS_ORIGIN='*' npm run server:dev`. Las apps nativas no lo
-necesitan, y en producción no debe definirse.
+Para probar con la app en el **navegador** (`npm run web` o abrir
+`http://localhost:8081`) no hace falta configurar nada: el servidor siempre
+acepta los orígenes `localhost` y `127.0.0.1`, tanto en local como en Render.
+Las apps nativas no usan CORS. Si algún día publicas la app web en un dominio,
+agrégalo en la variable `CORS_ORIGIN` (varios, separados por coma).
 
 Para probar contra tu Supabase desde tu computadora, define `DATABASE_URL`
 con la cadena del Session pooler al arrancar el servidor local. Sin

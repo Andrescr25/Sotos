@@ -1,4 +1,4 @@
-import { describeConnectionProblem, getPoolOptions, loadConfig } from './config';
+import { cleanEnvValue, describeConnectionProblem, getPoolOptions, loadConfig } from './config';
 
 const POOLER = 'postgresql://postgres.abcdefghijkl:secreta@aws-0-us-east-1.pooler.supabase.com:5432/postgres';
 const DIRECT = 'postgresql://postgres:secreta@db.abcdefghijkl.supabase.co:5432/postgres';
@@ -72,5 +72,33 @@ describe('describeConnectionProblem', () => {
     expect(describeConnectionProblem('esto no es una url')).toMatch(/no es una URL válida/);
     // Codificada (%23) sí es válida.
     expect(describeConnectionProblem('postgresql://postgres:pa%23ss@host.example.com:5432/postgres')).toBeNull();
+  });
+});
+
+describe('cleanEnvValue / valores pegados a mano', () => {
+  it('quita comillas, espacios y saltos de línea', () => {
+    expect(cleanEnvValue('  hola  ')).toBe('hola');
+    expect(cleanEnvValue('"hola"')).toBe('hola');
+    expect(cleanEnvValue("'hola'")).toBe('hola');
+    expect(cleanEnvValue('"hola\n"')).toBe('hola');
+    expect(cleanEnvValue(undefined)).toBeUndefined();
+  });
+
+  it('DATABASE_URL con comillas y salto de línea (como se pega en Render) se corrige y avisa', () => {
+    const config = loadConfig({ DATABASE_URL: `"${POOLER}\n"` });
+
+    expect(config.databaseUrl).toBe(POOLER);
+    expect(config.warnings).toHaveLength(1);
+    expect(config.warnings[0]).toMatch(/sin comillas/);
+  });
+
+  it('un valor limpio no genera avisos', () => {
+    expect(loadConfig({ DATABASE_URL: POOLER }).warnings).toEqual([]);
+  });
+
+  it('no altera la contraseña del administrador', () => {
+    const config = loadConfig({ ADMIN_USERNAME: ' dueno\n', ADMIN_PASSWORD: ' con espacios ' });
+    expect(config.admin.username).toBe('dueno');
+    expect(config.admin.password).toBe(' con espacios ');
   });
 });

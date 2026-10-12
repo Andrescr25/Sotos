@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { usersSeed } from '@/data/seed/users';
 import { describeConnectionProblem, getPoolOptions, loadConfig } from './config';
+import { explainConnectionError, isDatabaseError } from './diagnostics/databaseCheck';
 import { createApp } from './createApp';
 import { hashPassword } from './security/passwords';
 import { createMemoryStore } from './store/createMemoryStore';
@@ -18,6 +19,7 @@ async function seedDevelopmentUsers(userStore) {
 
 async function main() {
   const config = loadConfig();
+  config.warnings.forEach((warning) => console.warn(`Aviso de configuración: ${warning}`));
 
   let orderStore;
   let userStore;
@@ -73,6 +75,10 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('No se pudo iniciar el servidor', error);
+  console.error('No se pudo iniciar el servidor.');
+  // Un error de base de datos se explica en español; el detalle técnico solo
+  // se muestra si se pide (DEBUG=1) para no llenar el log con el stack.
+  console.error(isDatabaseError(error) ? explainConnectionError(error) : error.message);
+  if (process.env.DEBUG || !isDatabaseError(error)) console.error(error);
   process.exit(1);
 });

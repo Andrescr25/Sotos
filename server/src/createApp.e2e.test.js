@@ -132,6 +132,42 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       ).toBe(401);
     });
 
+    it('CORS: la app web local puede iniciar sesión; un sitio ajeno no', async () => {
+      const preflight = (origin) =>
+        fetch(`${baseUrl}/auth/login`, {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'content-type',
+          },
+        });
+
+      const local = await preflight('http://localhost:8081');
+      expect(local.status).toBe(204);
+      expect(local.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+      expect(local.headers.get('access-control-allow-headers')).toMatch(/Authorization/);
+
+      const foreign = await preflight('https://sitio-malicioso.example');
+      expect(foreign.status).toBe(404);
+      expect(foreign.headers.get('access-control-allow-origin')).toBeNull();
+
+      // La respuesta real también lleva la cabecera, o el navegador la descarta.
+      const login = await fetch(`${baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { Origin: 'http://localhost:8081', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+      });
+      expect(login.status).toBe(200);
+      expect(login.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+    });
+
+    it('la raíz del servidor confirma que está activo (no es un error al abrirla en un navegador)', async () => {
+      const response = await fetch(`${baseUrl}/`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ service: 'sotos-server', status: 'ok' });
+    });
+
     it('quien se registra queda SIN rol y no puede ver pedidos ni usuarios', async () => {
       const { device, user } = await registerStaff('maria', 'María Pérez');
 

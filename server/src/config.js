@@ -13,15 +13,24 @@
  * | ADMIN_NAME        | Nombre para mostrar del primer administrador                  |
  * | SESSION_TTL_DAYS  | Duración de una sesión (por defecto 30 días)                  |
  * | BUSINESS_TZ       | Zona horaria que define cuándo reinicia el #consecutivo       |
- * | CORS_ORIGIN       | Solo desarrollo con la app en el navegador (ej. "*"). Las apps |
- * |                   | nativas no lo necesitan; en producción déjalo sin definir     |
+ * | CORS_ORIGIN       | Orígenes web extra permitidos, separados por coma (o "*").    |
+ * |                   | localhost y 127.0.0.1 siempre se permiten (desarrollo)        |
  * | NODE_ENV          | "production" exige DATABASE_URL                               |
  *
  * @param {Record<string, string | undefined>} [env]
  */
 export function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
-  const databaseUrl = env.DATABASE_URL || null;
+  const warnings = [];
+
+  // Valores pegados a mano en el panel de Render suelen traer comillas o un
+  // salto de línea al final; se limpian en vez de fallar con un error críptico.
+  const databaseUrl = cleanEnvValue(env.DATABASE_URL) || null;
+  if (env.DATABASE_URL && databaseUrl !== env.DATABASE_URL) {
+    warnings.push(
+      'DATABASE_URL traía comillas, espacios o saltos de línea; se ignoraron. En Render pega el valor sin comillas y en una sola línea.',
+    );
+  }
 
   const config = {
     nodeEnv,
@@ -32,13 +41,18 @@ export function loadConfig(env = process.env) {
     databaseSslCa: env.DATABASE_SSL_CA ? env.DATABASE_SSL_CA.replace(/\\n/g, '\n') : null,
     databasePoolMax: Number(env.DATABASE_POOL_MAX) || 5,
     timeZone: env.BUSINESS_TZ || 'America/Costa_Rica',
-    corsOrigin: env.CORS_ORIGIN || null,
+    corsOrigins: (env.CORS_ORIGIN || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     sessionTtlDays: Number(env.SESSION_TTL_DAYS) || 30,
     admin: {
-      username: env.ADMIN_USERNAME || null,
+      username: cleanEnvValue(env.ADMIN_USERNAME) || null,
+      // La contraseña se toma tal cual: podría llevar espacios o comillas a propósito.
       password: env.ADMIN_PASSWORD || null,
-      name: env.ADMIN_NAME || null,
+      name: cleanEnvValue(env.ADMIN_NAME) || null,
     },
+    warnings,
   };
 
   if (nodeEnv === 'production' && !config.databaseUrl) {
@@ -46,6 +60,20 @@ export function loadConfig(env = process.env) {
   }
 
   return config;
+}
+
+/**
+ * Quita espacios, saltos de línea y comillas envolventes de un valor de
+ * variable de entorno.
+ * @param {string | undefined} value
+ * @returns {string | undefined}
+ */
+export function cleanEnvValue(value) {
+  if (typeof value !== 'string') return value;
+  let cleaned = value.trim();
+  const quoted = /^(["'])([\s\S]*)\1$/.exec(cleaned);
+  if (quoted) cleaned = quoted[2].trim();
+  return cleaned;
 }
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
