@@ -1,5 +1,5 @@
 import { ORDER_ERROR } from '@/domain/orders';
-import { SCHEMA_STATEMENTS } from './schema';
+import { ORDER_SCHEMA } from './schema';
 
 const LIST_LIMIT = 1000;
 
@@ -15,7 +15,7 @@ const LIST_LIMIT = 1000;
 export function createPostgresStore(db) {
   return {
     async init() {
-      for (const statement of SCHEMA_STATEMENTS) {
+      for (const statement of ORDER_SCHEMA) {
         await db.query(statement);
       }
     },

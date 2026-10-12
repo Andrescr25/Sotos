@@ -1,3 +1,5 @@
+import { AppError, COMMON_ERROR } from '@/shared/errors/AppError';
+
 export const ORDER_ERROR = Object.freeze({
   INVALID_QUANTITY: 'invalid_quantity',
   INVALID_NUMBER: 'invalid_number',
@@ -11,24 +13,21 @@ export const ORDER_ERROR = Object.freeze({
   INVALID_TRANSITION: 'invalid_transition',
   INVALID_ORDER: 'invalid_order',
   CONFLICT: 'conflict',
-  FORBIDDEN: 'forbidden',
-  /** El servidor rechazó la clave de API. */
-  UNAUTHORIZED: 'unauthorized',
-  /** No se pudo contactar al servidor (sin WiFi, servidor caído...). */
-  NETWORK: 'network',
+  FORBIDDEN: COMMON_ERROR.FORBIDDEN,
+  UNAUTHORIZED: COMMON_ERROR.UNAUTHORIZED,
+  NETWORK: COMMON_ERROR.NETWORK,
 });
 
 /**
- * Error de regla de negocio. La UI decide qué mensaje mostrar según `code`.
+ * Error de regla de negocio de pedidos. La UI decide qué mensaje mostrar según `code`.
  */
-export class OrderError extends Error {
+export class OrderError extends AppError {
   /**
    * @param {string} code uno de ORDER_ERROR
    * @param {string} message
    */
   constructor(code, message) {
-    super(message);
+    super(code, message);
     this.name = 'OrderError';
-    this.code = code;
   }
 }

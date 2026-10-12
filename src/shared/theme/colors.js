@@ -27,6 +27,13 @@ export const colors = {
   danger: '#E03131',
   info: '#1C7ED6',
 
+  // Versiones suaves para fondos de avisos, chips y selección
+  primarySoft: '#FFF0E6',
+  successSoft: '#EAF7EC',
+  warningSoft: '#FFF4E0',
+  dangerSoft: '#FDECEC',
+  infoSoft: '#E7F1FB',
+
   // Color de cada estado de pedido (las claves son los valores de ORDER_STATUS)
   status: {
     draft: '#868E96',

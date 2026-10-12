@@ -1,4 +1,4 @@
-import { OrderError, checkOrderWrite } from '@/domain/orders';
+import { OrderError, checkOrderActor, checkOrderWrite } from '@/domain/orders';
 import { createEventEmitter } from '@/shared/utils/createEventEmitter';
 import { getBusinessDay } from '@/shared/utils/time';
 
@@ -7,12 +7,15 @@ import { getBusinessDay } from '@/shared/utils/time';
  * backend. Limitación: solo comunica pantallas dentro del MISMO dispositivo;
  * para caja y cocina en tablets distintas se usa el adaptador remoto.
  *
- * Aplica las mismas reglas de guardado que el servidor (`checkOrderWrite`).
+ * Aplica las mismas reglas de guardado que el servidor (`checkOrderWrite`) y,
+ * si se le indica quién es el usuario de la sesión, también `checkOrderActor`.
  *
- * @param {{ now?: () => Date }} [options]
+ * @param {Object} [options]
+ * @param {() => Date} [options.now]
+ * @param {() => import('@/domain/users/roles').User | null} [options.getActor]
  * @returns {import('@/data/contracts').OrderRepository}
  */
-export function createMemoryOrderRepository({ now = () => new Date() } = {}) {
+export function createMemoryOrderRepository({ now = () => new Date(), getActor } = {}) {
   /** @type {Map<string, import('@/domain/orders/order').Order>} */
   const orders = new Map();
   const events = createEventEmitter();
@@ -20,7 +23,9 @@ export function createMemoryOrderRepository({ now = () => new Date() } = {}) {
 
   return {
     async save(order) {
-      const verdict = checkOrderWrite(orders.get(order.id) ?? null, order);
+      const existing = orders.get(order.id) ?? null;
+      let verdict = checkOrderWrite(existing, order);
+      if (verdict.ok && getActor) verdict = checkOrderActor(existing, order, getActor());
       if (!verdict.ok) throw new OrderError(verdict.code, verdict.message);
 
       orders.set(order.id, order);

@@ -1,32 +1,62 @@
 import pg from 'pg';
-import { loadConfig } from './config';
+import { usersSeed } from '@/data/seed/users';
+import { describeConnectionProblem, getPoolOptions, loadConfig } from './config';
 import { createApp } from './createApp';
+import { hashPassword } from './security/passwords';
 import { createMemoryStore } from './store/createMemoryStore';
+import { createMemoryUserStore } from './store/createMemoryUserStore';
 import { createPgDb } from './store/createPgDb';
 import { createPostgresStore } from './store/createPostgresStore';
+import { createPostgresUserStore } from './store/createPostgresUserStore';
+
+/** Cuentas de ejemplo para desarrollo local en memoria (ver data/seed/users). */
+async function seedDevelopmentUsers(userStore) {
+  for (const { password, ...user } of usersSeed) {
+    await userStore.createUser({ ...user, passwordHash: await hashPassword(password) });
+  }
+}
 
 async function main() {
   const config = loadConfig();
 
-  let store;
-  if (config.databaseUrl) {
-    const pool = new pg.Pool({
-      connectionString: config.databaseUrl,
-      ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
-      max: 10,
-    });
-    store = createPostgresStore(createPgDb(pool));
+  let orderStore;
+  let userStore;
+  const inMemory = !config.databaseUrl;
+
+  if (inMemory) {
+    console.warn('DATABASE_URL no definida: usando memoria (los datos se pierden al reiniciar).');
+    orderStore = createMemoryStore();
+    userStore = createMemoryUserStore();
   } else {
-    console.warn('DATABASE_URL no definida: usando memoria (los pedidos se pierden al reiniciar).');
-    store = createMemoryStore();
-  }
-  await store.init();
+    const problem = describeConnectionProblem(config.databaseUrl);
+    if (problem) console.warn(problem);
 
-  if (!config.apiKey) {
-    console.warn('API_KEY no definida: el servidor acepta cualquier cliente (solo desarrollo).');
+    const pool = new pg.Pool(getPoolOptions(config));
+    const db = createPgDb(pool);
+    orderStore = createPostgresStore(db);
+    userStore = createPostgresUserStore(db);
   }
 
-  const app = createApp({ store, config });
+  await orderStore.init();
+  await userStore.init();
+
+  const app = createApp({ orderStore, userStore, config });
+
+  if (inMemory) {
+    await seedDevelopmentUsers(userStore);
+    console.log('Cuentas de desarrollo: admin/admin123, cajero/cajero123, cocinero/cocinero123, pendiente/pendiente123');
+  }
+
+  const bootstrap = await app.authService.ensureAdmin(config.admin);
+  if (bootstrap === 'created' || bootstrap === 'promoted') {
+    console.log(`Administrador inicial listo (${bootstrap}): ${config.admin.username}`);
+  } else if (bootstrap === 'missing') {
+    const message =
+      'No hay ningún administrador. Define ADMIN_USERNAME y ADMIN_PASSWORD para crear el primero.';
+    if (config.nodeEnv === 'production') throw new Error(message);
+    console.warn(message);
+  }
+
   const port = await app.listen(config.port);
   console.log(`Servidor de pedidos escuchando en el puerto ${port}`);
 
@@ -34,7 +64,8 @@ async function main() {
   const shutdown = async (signal) => {
     console.log(`${signal} recibido: cerrando...`);
     await app.close();
-    await store.close();
+    await orderStore.close();
+    await userStore.close();
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));

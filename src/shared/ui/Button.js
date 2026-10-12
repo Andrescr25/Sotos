@@ -28,8 +28,9 @@ const VARIANTS = {
  * @param {keyof typeof VARIANTS} [props.variant]
  * @param {string} [props.icon]  nombre de icono a la izquierda
  * @param {boolean} [props.disabled]
+ * @param {boolean} [props.compact]  versión más baja para barras y filas
  */
-export function Button({ label, onPress, variant = 'primary', icon, disabled = false, style }) {
+export function Button({ label, onPress, variant = 'primary', icon, disabled = false, compact = false, style }) {
   const palette = VARIANTS[variant];
 
   return (
@@ -40,6 +41,7 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled = f
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
+        compact && styles.compact,
         { backgroundColor: pressed ? palette.pressed : palette.background },
         disabled && styles.disabled,
         style,
@@ -63,5 +65,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: theme.spacing.sm,
   },
+  compact: { minHeight: 44, paddingHorizontal: theme.spacing.lg },
   disabled: { opacity: 0.4 },
 });

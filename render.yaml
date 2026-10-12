@@ -1,17 +1,21 @@
-# Blueprint de Render: crea el servidor y la base de datos de una sola vez.
-# Guía paso a paso: docs/DESPLIEGUE_RENDER.md
+# Blueprint de Render: crea SOLO el servidor (sotos-server).
+# La base de datos vive en Supabase (Postgres); aquí solo se recibe su
+# cadena de conexión como variable de entorno. Guía: docs/DESPLIEGUE_RENDER.md
 #
-# IMPORTANTE: los planes "free" NO sirven para un restaurante real:
-#   - El servicio gratuito se duerme tras 15 min sin tráfico (el primer pedido
-#     tardaría ~1 minuto en llegar a cocina).
-#   - La base de datos gratuita expira a los 30 días y luego se borra.
-# Por eso aquí se usan planes de pago. Revisa precios en https://render.com/pricing
+# IMPORTANTE:
+#   - El plan "free" del servicio NO sirve para un restaurante: se duerme tras
+#     15 min sin tráfico y el primer pedido tardaría ~1 minuto en llegar a cocina.
+#     Por eso se usa 0.5c-512mb (plan de pago de Render).
+#   - Render solo tiene IPv4, y la conexión DIRECTA de Supabase es IPv6.
+#     DATABASE_URL debe ser la del "Session pooler" de Supabase (puerto 5432).
 
 services:
   - type: web
     name: sotos-server
     runtime: node
-    region: oregon # elige la región más cercana a tu restaurante; debe ser la misma que la base de datos
+    # Misma zona que el proyecto de Supabase (us-east-2 = Ohio) para menos latencia.
+    # OJO: la región NO se puede cambiar después de crear el servicio.
+    region: ohio
     plan: 0.5c-512mb
     buildCommand: npm ci --prefix server && npm run build --prefix server
     startCommand: node server/dist/index.js
@@ -24,16 +28,15 @@ services:
         value: production
       - key: BUSINESS_TZ
         value: America/Costa_Rica
-      - key: API_KEY
-        generateValue: true # Render genera una clave; cópiala a EXPO_PUBLIC_API_KEY
+      # Cadena de conexión de Supabase (Session pooler). Render la pide al crear
+      # el Blueprint y no se guarda en el repositorio.
       - key: DATABASE_URL
-        fromDatabase:
-          name: sotos-db
-          property: connectionString
-
-databases:
-  - name: sotos-db
-    plan: 0.1c-256mb
-    region: oregon
-    databaseName: sotos
-    user: sotos
+        sync: false
+      # Primer administrador. Solo se usa si todavía no existe ninguno; después
+      # se pueden quitar estas variables. Render las pide al crear el Blueprint.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        value: Administrador

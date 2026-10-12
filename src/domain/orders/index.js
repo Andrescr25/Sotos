@@ -11,7 +11,7 @@ export {
 export { createOrderItem, getItemKey } from './orderItem';
 export { calculateItemTotal, calculateOrderTotals } from './pricing';
 export { formatOrderNumber } from './orderNumber';
-export { checkOrderWrite } from './orderIntegrity';
+export { checkOrderWrite, checkOrderActor } from './orderIntegrity';
 export {
   createDraftOrder,
   addItem,

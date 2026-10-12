@@ -1,7 +1,42 @@
+import { PERMISSIONS, can } from '@/domain/users/permissions';
 import { deepEqual } from '@/shared/utils/deepEqual';
 import { ORDER_ERROR } from './orderErrors';
 import { ORDER_STATUS, getTransitionPermission } from './orderStatus';
 import { calculateOrderTotals } from './pricing';
+
+/**
+ * Quién puede guardar este cambio. Se evalúa con el usuario de la SESIÓN, no
+ * con el que venga escrito en el pedido:
+ *
+ * - El cambio debe estar firmado por ese mismo usuario (nadie actúa a nombre de otro).
+ * - Su rol debe tener el permiso de la transición (crear/enviar, empezar, listo...).
+ *
+ * Se usa junto a `checkOrderWrite`, dentro de la misma operación atómica.
+ *
+ * @param {import('./order').Order | null} existing
+ * @param {import('./order').Order} incoming
+ * @param {import('@/domain/users/roles').User} user  usuario autenticado
+ * @returns {WriteVerdict}
+ */
+export function checkOrderActor(existing, incoming, user) {
+  const fail = (message) => ({ ok: false, code: ORDER_ERROR.FORBIDDEN, message });
+
+  const lastChange = incoming.statusHistory[incoming.statusHistory.length - 1];
+  if (!user || lastChange.by?.id !== user.id) {
+    return fail('El cambio debe estar firmado por el usuario que inició sesión');
+  }
+  if (!existing && incoming.createdBy?.id !== user.id) {
+    return fail('El pedido debe quedar a nombre de quien lo envía');
+  }
+
+  const permission = existing
+    ? getTransitionPermission(existing.status, incoming.status)
+    : PERMISSIONS.ORDER_SEND;
+  if (!permission || !can(user.role, permission)) {
+    return fail('Tu rol no tiene permiso para realizar esta acción');
+  }
+  return { ok: true };
+}
 
 /**
  * Reglas que todo almacenamiento (memoria, servidor...) debe hacer cumplir al
@@ -14,8 +49,8 @@ import { calculateOrderTotals } from './pricing';
  * - `existing` es lo que hay guardado (o null) leído dentro de la misma
  *   transacción que la escritura: así se detectan escrituras concurrentes.
  *
- * Nota: el historial lleva a quién hizo cada cambio, pero todavía no se
- * verifica su rol en el servidor (falta autenticación real).
+ * La identidad y el rol de quien guarda se verifican aparte con
+ * `checkOrderActor`, usando el usuario de la sesión.
  *
  * @typedef {{ ok: true } | { ok: false, code: string, message: string }} WriteVerdict
  *

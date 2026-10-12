@@ -65,6 +65,9 @@ export function createOrderService({ orderRepository, now = () => new Date() }) 
     /** Pedidos que cocina debe mostrar (Nuevo, En preparación, Listo). */
     listKitchenOrders: () => orderRepository.list({ statuses: [...KITCHEN_STATUSES] }),
 
+    /** Pedidos en alguno de los estados dados, del más antiguo al más nuevo. */
+    listByStatus: (statuses) => orderRepository.list({ statuses: [...statuses] }),
+
     /**
      * Avisa cada vez que un pedido se guarda o cambia de estado.
      * @param {(event: import('@/data/contracts').OrderEvent) => void} listener

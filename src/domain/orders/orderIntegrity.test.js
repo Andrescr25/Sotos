@@ -6,6 +6,7 @@ import {
   ORDER_STATUS,
   addItem,
   changeOrderStatus,
+  checkOrderActor,
   checkOrderWrite,
   createDraftOrder,
   createOrderItem,
@@ -26,6 +27,46 @@ function sentOrder() {
 }
 
 const codeOf = (verdict) => (verdict.ok ? null : verdict.code);
+
+describe('checkOrderActor', () => {
+  const [, , admin, pendingUser] = usersSeed;
+
+  it('acepta que el cajero de la sesión envíe su pedido', () => {
+    expect(checkOrderActor(null, sentOrder(), cashier)).toEqual({ ok: true });
+  });
+
+  it('rechaza que alguien firme a nombre de otro', () => {
+    const order = sentOrder();
+    expect(codeOf(checkOrderActor(null, order, cook))).toBe(ORDER_ERROR.FORBIDDEN);
+  });
+
+  it('rechaza un cambio para el que el rol no tiene permiso', () => {
+    const existing = sentOrder();
+    // El cajero intenta empezar la preparación firmando con su propio usuario.
+    const started = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: admin, now: at(2) });
+    const signedAsCashier = {
+      ...started,
+      statusHistory: started.statusHistory.map((change, index, all) =>
+        index === all.length - 1 ? { ...change, by: { id: cashier.id, name: cashier.name } } : change,
+      ),
+    };
+    expect(codeOf(checkOrderActor(existing, signedAsCashier, cashier))).toBe(ORDER_ERROR.FORBIDDEN);
+  });
+
+  it('acepta al cocinero iniciando y al administrador en cualquier paso', () => {
+    const existing = sentOrder();
+    const byCook = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
+    const byAdmin = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: admin, now: at(2) });
+
+    expect(checkOrderActor(existing, byCook, cook)).toEqual({ ok: true });
+    expect(checkOrderActor(existing, byAdmin, admin)).toEqual({ ok: true });
+  });
+
+  it('una cuenta sin rol no puede guardar nada', () => {
+    const order = sentOrder();
+    expect(codeOf(checkOrderActor(null, order, pendingUser))).toBe(ORDER_ERROR.FORBIDDEN);
+  });
+});
 
 describe('checkOrderWrite — creación', () => {
   it('acepta un pedido recién enviado a cocina', () => {

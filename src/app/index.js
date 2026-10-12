@@ -1,43 +1,17 @@
-import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-import { ROLE_LABELS, ROLES } from '@/domain/users';
-import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
-import { Button, Screen, Text } from '@/shared/ui';
+import { Redirect } from 'expo-router';
+import { AREA_ROUTES } from '@/config/routes';
+import { getHomeArea } from '@/domain/users';
+import { useAuth } from '@/features/auth';
 
 /**
- * Selector de rol provisional para desarrollo. Se reemplazará por el inicio
- * de sesión real, que enviará a cada usuario a la ruta de su rol.
+ * Punto de entrada: lleva a cada persona a donde corresponde según su cuenta.
+ * No hay selector de rol: el acceso lo asigna el administrador.
  */
-const ENTRIES = [
-  { role: ROLES.CASHIER, href: '/caja', icon: 'receipt' },
-  { role: ROLES.COOK, href: '/cocina', icon: 'flame' },
-  { role: ROLES.ADMIN, href: '/admin', icon: 'settings' },
-];
+export default function Index() {
+  const { status, user } = useAuth();
 
-export default function Home() {
-  const router = useRouter();
+  if (status !== 'signedIn') return <Redirect href="/login" />;
 
-  return (
-    <Screen style={commonStyles.center}>
-      <View style={styles.content}>
-        <Text variant="display">Sotos</Text>
-        <Text color="textSecondary">Entrar como…</Text>
-        {ENTRIES.map(({ role, href, icon }) => (
-          <Button
-            key={role}
-            label={ROLE_LABELS[role]}
-            icon={icon}
-            onPress={() => router.push(href)}
-            style={styles.button}
-          />
-        ))}
-      </View>
-    </Screen>
-  );
+  const area = getHomeArea(user);
+  return <Redirect href={area ? AREA_ROUTES[area] : '/pendiente'} />;
 }
-
-const styles = StyleSheet.create({
-  content: { alignItems: 'center', gap: theme.spacing.lg },
-  button: { minWidth: 320 },
-});
