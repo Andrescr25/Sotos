@@ -18,7 +18,7 @@ contabilidad, mesas, pagos, división de cuentas, delivery, gestión de producto
 | Pieza | Elección |
 |---|---|
 | Lenguaje | JavaScript (JSDoc para documentar formas de datos) |
-| App | React Native con Expo (SDK 57), pensada para tablets |
+| App | React Native con Expo (SDK 57), pensada para tablets. Se publica como **app web instalable** (sitio estático en Render); también corre en Expo Go |
 | Navegación | Expo Router (rutas en `src/app/`, protegidas con `Stack.Protected`) |
 | Iconos | `@react-native-vector-icons/ionicons` (envuelto en `shared/ui/Icon`) |
 | Backend | Servicio Node (HTTP + WebSocket) en **Render** + Postgres en **Supabase** (ver `docs/DESPLIEGUE_RENDER.md`) |
@@ -69,6 +69,9 @@ src/
     ├── errors/     AppError y mensajes para el usuario
     ├── hooks/      useNow
     └── utils/      money, time, createId, createEventEmitter, deepEqual
+
+public/             Archivos de la app web: index.html, manifest.json e íconos (PWA).
+scripts/            generate-icons.sh: regenera los íconos desde assets/icon.svg.
 
 server/             Backend (paquete Node independiente, se despliega en Render; usa Postgres de Supabase).
 └── src/
@@ -348,6 +351,8 @@ cuenta con rol asignado por el administrador.
 ```bash
 npm start               # app (Expo)
 npm run web             # app en el navegador (el servidor acepta localhost por CORS)
+npx expo export -p web  # genera dist/ (lo que publica sotos-app)
+bash scripts/generate-icons.sh   # íconos desde assets/icon.svg (macOS)
 npm test                # pruebas de app y servidor
 npm run test:watch
 npm run server:install  # instalar dependencias del servidor (una vez)

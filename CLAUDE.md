@@ -27,3 +27,11 @@ Arquitectura completa en `docs/ARQUITECTURA.md`; despliegue en `docs/DESPLIEGUE_
 - La seguridad real vive en el servidor (rol leído de la base en cada petición). Las rutas protegidas de Expo Router son solo comodidad de interfaz.
 - Una pantalla que dependa de `user` debe tolerar `user === null` un instante al cerrar sesión (ver `CashierScreen`).
 - Las pruebas de interfaz usan `@testing-library/react-native` v14, cuya API es **asíncrona** (`await render`, `await fireEvent.press`).
+
+## App web (sitio estático en Render)
+
+- El personal usa la **app web instalable** (`sotos-app`, sitio estático); `render.yaml` la construye con `npx expo export --platform web`. Mantener `web.output: single` y la regla de reescritura `/* → /index.html`.
+- `src/data/index.js` y `src/config/runtime.js` eligen memoria/servidor con `process.env.EXPO_PUBLIC_API_URL` **leído de forma estática y con `require` dentro de cada rama**: así el build con servidor descarta las cuentas de ejemplo (con contraseñas de prueba). No volver a importarlas de forma estática.
+- Tras cambiar `EXPO_PUBLIC_API_URL` en local, arrancar con `npx expo start --clear` (Metro cachea la variable).
+- El ícono sale de `assets/icon.svg`; regenerar PNG con `bash scripts/generate-icons.sh`. Colores del manifest = tokens de `shared/theme` (hay una prueba).
+- La URL de `sotos-app` debe estar en `CORS_ORIGIN` del servidor (`render.yaml`).

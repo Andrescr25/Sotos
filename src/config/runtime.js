@@ -1,5 +1,3 @@
-import { usersSeed } from '@/data/seed/users';
-
 /**
  * Configuración que se decide al compilar la app.
  *
@@ -11,12 +9,19 @@ import { usersSeed } from '@/data/seed/users';
 export const apiUrl = process.env.EXPO_PUBLIC_API_URL || '';
 
 /** `true` si la app trabaja contra el servidor; `false` en modo memoria (desarrollo). */
-export const isRemote = Boolean(apiUrl);
+export const isRemote = Boolean(process.env.EXPO_PUBLIC_API_URL);
 
 /**
  * Cuentas de ejemplo que la pantalla de login ofrece como atajo. Solo existen
- * en modo memoria; con servidor real la lista está vacía.
+ * en modo memoria; con servidor la lista está vacía.
+ *
+ * El `require` va dentro de la rama para que, al compilar con servidor, los
+ * datos de ejemplo (y sus contraseñas de prueba) se descarten del paquete.
  */
-export const devAccounts = isRemote
+export const devAccounts = process.env.EXPO_PUBLIC_API_URL
   ? []
-  : usersSeed.map(({ id, username, password }) => ({ id, username, password }));
+  : require('@/data/seed/users').usersSeed.map(({ id, username, password }) => ({
+      id,
+      username,
+      password,
+    }));

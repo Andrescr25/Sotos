@@ -1,7 +1,8 @@
-# Despliegue: Render (servidor) + Supabase (base de datos)
+# Despliegue: Render (servidor y app web) + Supabase (base de datos)
 
 | Pieza | Dónde vive | Qué es |
 |---|---|---|
+| `sotos-app` | **Render** (sitio estático, sin plan de cómputo) | La app web: el personal la abre desde el navegador de la tablet |
 | `sotos-server` | **Render** (plan `0.5c-512mb`, $7/mes) | Servicio Node: API HTTP + WebSocket en tiempo real |
 | Base de datos | **Supabase** | Postgres: pedidos, cuentas y sesiones |
 
@@ -77,7 +78,8 @@ proyecto pausado).
    git. Debe incluir `src/` y `server/` (el servidor reutiliza `src/domain`).
    No definas "Root Directory" en Render.
 2. En Render: **New → Blueprint**, conecta el repositorio y elige la rama.
-   Render lee `render.yaml` y propone crear solo `sotos-server`.
+   Render lee `render.yaml` y propone crear **dos** servicios: `sotos-server`
+   (la API) y `sotos-app` (la app web, sitio estático).
 3. Render pide tres valores (no se guardan en el repositorio):
    - `DATABASE_URL`: la cadena del Session pooler del paso 1.
    - `ADMIN_USERNAME`: usuario del **primer administrador** (ej. `dueno`).
@@ -89,19 +91,54 @@ proyecto pausado).
 5. En Supabase → **Table Editor** deben aparecer `orders`, `order_counters`,
    `users` y `sessions`.
 
-## Paso 3 — La app
+## Paso 3 — La app en las tablets (desde el navegador)
 
-En tu computadora, crea `.env.local` (basado en `.env.example`):
+La app web ya la publica `sotos-app`. En cada tablet o teléfono:
+
+1. Abre en el navegador la dirección del sitio (Render la muestra en el
+   servicio `sotos-app`; por defecto `https://sotos-app.onrender.com`).
+2. **Instálala** para que se abra a pantalla completa, como una app:
+   - **iPad / iPhone (Safari):** botón **Compartir → Añadir a pantalla de
+     inicio**.
+   - **Android (Chrome):** menú **⋮ → Instalar aplicación** (o *Añadir a la
+     pantalla de inicio*).
+   - **Computadora (Chrome / Edge):** ícono de instalar en la barra de
+     direcciones.
+3. Inicia sesión. Cada persona entra con su propia cuenta.
+
+No hay que instalar nada de tiendas ni usar Expo Go. Cuando se publique una
+versión nueva, basta con volver a abrir la app (o recargar la página).
+
+### Nombres y direcciones
+
+El `render.yaml` da por hecho estos nombres y direcciones:
+
+| | Nombre | Dirección |
+|---|---|---|
+| API | `sotos-server` | `https://sotos-server.onrender.com` |
+| App web | `sotos-app` | `https://sotos-app.onrender.com` |
+
+Si Render te asigna otra dirección (porque el nombre ya estaba tomado), corrige
+**dos** cosas en `render.yaml` y vuelve a subirlo:
+
+- `EXPO_PUBLIC_API_URL` en `sotos-app` → la dirección real de la API.
+- `CORS_ORIGIN` en `sotos-server` → la dirección real de la app web. Sin esto
+  el navegador bloquea la conexión y la app muestra "No hay conexión".
+
+### Desarrollo con Expo
+
+Para desarrollar en tu computadora, crea `.env.local`:
 
 ```
-EXPO_PUBLIC_API_URL=https://<tu-servicio>.onrender.com
+EXPO_PUBLIC_API_URL=https://sotos-server.onrender.com
 ```
 
-Reinicia Expo con `npx expo start --clear`, o genera la app para las tablets, y
-entra con el administrador inicial.
+y arranca con `npx expo start --clear` (el `--clear` es necesario al cambiar
+esta variable, o Expo reutiliza la caché). Se abre en el navegador
+(`localhost:8081`, permitido por la API) o en Expo Go.
 
 > `EXPO_PUBLIC_*` se incrusta en la app al compilarla. Si cambias la URL hay
-> que volver a generar la app.
+> que volver a compilar (en Render: un nuevo despliegue de `sotos-app`).
 
 ## Cómo se da acceso al personal
 
@@ -203,6 +240,9 @@ ejemplo.
 
 ## Límites conocidos
 
+- **Sin modo sin conexión.** La app necesita internet: si la tablet pierde el
+  WiFi no se pueden enviar pedidos (el borrador se conserva y se reintenta).
+  El navegador no guarda una copia para trabajar sin red.
 - **Una sola instancia.** El canal en tiempo real vive en la memoria del
   proceso; no escalar a varias instancias sin añadir un bus compartido. El
   limitador de intentos de login también es por proceso.

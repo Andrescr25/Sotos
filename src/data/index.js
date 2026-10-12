@@ -1,43 +1,26 @@
-import { apiUrl, isRemote } from '@/config/runtime';
-import { createMemoryAccountRepositories } from './memory/createMemoryAccountRepositories';
 import { createMemoryMenuRepository } from './memory/createMemoryMenuRepository';
-import { createMemoryOrderRepository } from './memory/createMemoryOrderRepository';
-import { createHttpClient } from './remote/createHttpClient';
-import { createRealtimeClient } from './remote/createRealtimeClient';
-import { createRemoteAccountRepositories } from './remote/createRemoteAccountRepositories';
-import { createRemoteOrderRepository } from './remote/createRemoteOrderRepository';
-import { createSessionStore } from './session/createSessionStore';
-import { createTokenStorage } from './session/createTokenStorage';
 
 /**
  * Punto único donde se elige qué implementación de datos usa la app.
  *
- * - Con EXPO_PUBLIC_API_URL definida (archivo .env.local): servidor real (Render).
+ * - Con EXPO_PUBLIC_API_URL definida (.env.local o el build en Render):
+ *   servidor real.
  * - Sin ella: memoria, para desarrollar sin servidor (un solo dispositivo,
  *   con las cuentas de ejemplo de data/seed/users).
+ *
+ * IMPORTANTE: la variable se lee con acceso estático y los `require` van
+ * dentro de cada rama. Así, al compilar con servidor, Expo reemplaza la
+ * variable por su valor y descarta la rama en memoria: las cuentas de ejemplo
+ * (con contraseñas de prueba) no viajan en la app publicada.
  */
-
-function createRemote() {
-  const session = createSessionStore({ storage: createTokenStorage() });
-  const http = createHttpClient({ baseUrl: apiUrl, session });
-  const realtime = createRealtimeClient({ baseUrl: apiUrl, session });
-  const accounts = createRemoteAccountRepositories({ http, realtime, session });
-  return {
-    orderRepository: createRemoteOrderRepository({ http, realtime }),
-    ...accounts,
-  };
+let repositories;
+if (process.env.EXPO_PUBLIC_API_URL) {
+  const { createRemoteRepositories } = require('./createRemoteRepositories');
+  repositories = createRemoteRepositories(process.env.EXPO_PUBLIC_API_URL);
+} else {
+  const { createInMemoryRepositories } = require('./createInMemoryRepositories');
+  repositories = createInMemoryRepositories();
 }
-
-function createInMemory() {
-  const accounts = createMemoryAccountRepositories();
-  return {
-    orderRepository: createMemoryOrderRepository({ getActor: accounts.getCurrentUser }),
-    authRepository: accounts.authRepository,
-    userRepository: accounts.userRepository,
-  };
-}
-
-const repositories = isRemote ? createRemote() : createInMemory();
 
 export const { orderRepository, authRepository, userRepository } = repositories;
 

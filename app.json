@@ -20,7 +20,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single",
+      "name": "Sotos — Pedidos",
+      "lang": "es"
     },
     "plugins": [
       "expo-router",
