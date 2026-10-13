@@ -26,5 +26,5 @@ export function Text({ variant = 'body', color = 'textPrimary', style, ...rest }
 }
 
 const styles = StyleSheet.create({
-  base: { includeFontPadding: false },
+  base: { includeFontPadding: false, flexShrink: 1 },
 });

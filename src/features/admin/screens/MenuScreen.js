@@ -1,13 +1,12 @@
-import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { PRODUCT_KIND_LABELS, isMenuEmpty } from '@/domain/menu';
-import { SessionBar } from '@/features/auth';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/screens/menu';
+import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
 import { formatColones } from '@/shared/utils/money';
-import { Banner, Button, Chip, Icon, Screen, Spinner, Text, TextField } from '@/shared/ui';
+import { Banner, Button, Chip, Icon, Spinner, Text, TextField } from '@/shared/ui';
 import { CategoryFormSheet } from '../components/CategoryFormSheet';
 import { ExtraFormSheet } from '../components/ExtraFormSheet';
 import { MenuItemRow } from '../components/MenuItemRow';
@@ -15,10 +14,10 @@ import { ProductFormSheet } from '../components/ProductFormSheet';
 import { useMenuAdmin } from '../hooks/useMenuAdmin';
 
 const TABS = [
-  { key: 'products', label: 'Platillos y bebidas' },
-  { key: 'extras', label: 'Extras' },
-  { key: 'categories', label: 'Categorías' },
-  { key: 'notes', label: 'Observaciones' },
+  { key: 'products', label: 'Platillos y bebidas', icon: 'restaurant-outline' },
+  { key: 'extras', label: 'Extras', icon: 'add-circle-outline' },
+  { key: 'categories', label: 'Categorías', icon: 'grid-outline' },
+  { key: 'notes', label: 'Observaciones', icon: 'chatbubble-outline' },
 ];
 
 const bySortOrder = (a, b) => a.sortOrder - b.sortOrder;
@@ -28,7 +27,6 @@ const bySortOrder = (a, b) => a.sortOrder - b.sortOrder;
  * categorías y observaciones frecuentes. Caja lo recibe en vivo.
  */
 export default function MenuScreen() {
-  const router = useRouter();
   const admin = useMenuAdmin();
   const { menu } = admin;
 
@@ -78,21 +76,13 @@ export default function MenuScreen() {
   const error = admin.loadError ?? (sheet ? null : admin.actionError);
 
   return (
-    <Screen>
-      <View style={[commonStyles.rowBetween, styles.header]}>
-        <View style={commonStyles.row}>
-          <Button compact variant="secondary" icon="arrow-back" label="Volver" onPress={() => router.back()} />
-          <Text variant="headline" style={styles.title}>Menú</Text>
-        </View>
-        <SessionBar />
-      </View>
-
+    <WorkspaceScreen section="menu" title="Menú" subtitle="Lo que servimos, siempre a mano." back>
       {error ? <Banner tone="error" message={getErrorMessage(error)} style={styles.banner} onDismiss={admin.clearError} /> : null}
 
       {admin.loading || !menu ? (
         <Spinner message="Cargando menú…" />
       ) : (
-        <>
+        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
           {isMenuEmpty(menu) ? (
             <View style={[commonStyles.card, styles.empty]}>
               <Icon name="restaurant" size="lg" color="primary" />
@@ -116,11 +106,11 @@ export default function MenuScreen() {
 
           <View style={styles.tabs}>
             {TABS.map((item) => (
-              <Chip key={item.key} label={item.label} selected={tab === item.key} onPress={() => setTab(item.key)} />
+              <Chip key={item.key} label={item.label} icon={item.icon} selected={tab === item.key} onPress={() => setTab(item.key)} />
             ))}
           </View>
 
-          <ScrollView contentContainerStyle={styles.list}>
+          <View style={styles.list}>
             {tab === 'products' ? (
               <>
                 <View style={styles.toolbar}>
@@ -165,6 +155,7 @@ export default function MenuScreen() {
                       .filter(Boolean)
                       .join(' · ')}
                     price={formatColones(product.price)}
+                    icon={product.kind === 'drink' ? 'cafe-outline' : 'fast-food-outline'}
                     active={product.active}
                     busy={admin.busy}
                     onToggleActive={(active) => admin.updateProduct(product.id, { active })}
@@ -196,6 +187,7 @@ export default function MenuScreen() {
                       .filter(Boolean)
                       .join(' · ')}
                     price={formatColones(extra.price)}
+                    icon="add-circle-outline"
                     active={extra.active}
                     busy={admin.busy}
                     onToggleActive={(active) => admin.updateExtra(extra.id, { active })}
@@ -270,8 +262,8 @@ export default function MenuScreen() {
                 </View>
               </>
             ) : null}
-          </ScrollView>
-        </>
+          </View>
+        </ScrollView>
       )}
 
       {sheet?.type === 'product' && menu ? (
@@ -312,31 +304,6 @@ export default function MenuScreen() {
           onClose={closeSheet}
         />
       ) : null}
-    </Screen>
+    </WorkspaceScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { marginBottom: theme.spacing.lg, gap: theme.spacing.lg },
-  title: { marginLeft: theme.spacing.lg },
-  banner: { marginBottom: theme.spacing.md },
-  empty: { alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg },
-  emptyText: { textAlign: 'center', maxWidth: 560 },
-  emptyActions: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md, justifyContent: 'center' },
-  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, marginBottom: theme.spacing.lg },
-  list: { gap: theme.spacing.md, paddingBottom: theme.spacing.xxl },
-  toolbar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-  },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, flexShrink: 1 },
-  hint: { flexShrink: 1 },
-  noteForm: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.md },
-  noteInput: { flex: 1 },
-  notes: { gap: theme.spacing.sm },
-  noteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md },
-  noteText: { flex: 1 },
-});

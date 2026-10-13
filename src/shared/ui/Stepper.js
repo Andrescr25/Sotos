@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { theme } from '@/shared/theme';
+import { Pressable, View } from 'react-native';
+import { styles } from '@/shared/styles/components/stepper';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -42,17 +42,3 @@ export function Stepper({ value, onChange, min = 0, max = Infinity, style }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  button: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  value: { minWidth: 36, textAlign: 'center' },
-  disabled: { opacity: 0.35 },
-});

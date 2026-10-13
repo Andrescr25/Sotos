@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet } from 'react-native';
 import { theme } from '@/shared/theme';
+import { Pressable } from 'react-native';
+import { styles } from '@/shared/styles/components/button';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -36,6 +37,7 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled = f
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -47,24 +49,10 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled = f
         style,
       ]}
     >
-      {icon ? <Icon name={icon} color={palette.content} /> : null}
-      <Text variant="label" color={palette.content}>
+      {icon ? <Icon name={icon} size="sm" color={palette.content} /> : null}
+      <Text variant="label" color={palette.content} style={styles.label}>
         {label}
       </Text>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    minHeight: theme.sizes.touchTarget,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.radius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.sm,
-  },
-  compact: { minHeight: 44, paddingHorizontal: theme.spacing.lg },
-  disabled: { opacity: 0.4 },
-});

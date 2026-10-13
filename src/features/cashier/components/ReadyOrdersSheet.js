@@ -1,8 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { formatOrderNumber } from '@/domain/orders';
 import { OrderItemsList } from '@/features/orders/components/OrderItemsList';
 import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/readyOrders';
 import { formatClockTime } from '@/shared/utils/time';
 import { Button, Sheet, Text } from '@/shared/ui';
 
@@ -43,7 +43,3 @@ export function ReadyOrdersSheet({ orders, busyId, onDeliver, onClose }) {
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  card: { gap: theme.spacing.md, backgroundColor: theme.colors.successSoft },
-});

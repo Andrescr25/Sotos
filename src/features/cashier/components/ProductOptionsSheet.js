@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { calculateItemTotal, createOrderItem } from '@/domain/orders';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/forms';
 import { formatColones } from '@/shared/utils/money';
 import { Button, Chip, Sheet, Stepper, Text, TextField } from '@/shared/ui';
 
@@ -64,7 +64,7 @@ export function ProductOptionsSheet({ product, extras, quickNotes, onAdd, onClos
             const value = Math.min(extraQuantities[extra.id] ?? 0, quantity);
             return (
               <View key={extra.id} style={styles.row}>
-                <View>
+                <View style={styles.optionInfo}>
                   <Text variant="bodyLarge">{extra.name}</Text>
                   <Text color="textSecondary">+{formatColones(extra.price)} c/u</Text>
                 </View>
@@ -102,9 +102,3 @@ export function ProductOptionsSheet({ product, extras, quickNotes, onAdd, onClos
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.lg },
-  section: { gap: theme.spacing.md },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-});

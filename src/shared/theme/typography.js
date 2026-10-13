@@ -3,12 +3,12 @@
  * una app de teléfono. Para agrandar o reducir toda la app, ajustar aquí.
  */
 export const fontSizes = {
-  caption: 14,
-  body: 18,
-  bodyLarge: 20,
-  title: 24,
-  headline: 32,
-  display: 44,
+  caption: 13,
+  body: 16,
+  bodyLarge: 18,
+  title: 22,
+  headline: 30,
+  display: 40,
 };
 
 export const fontWeights = {

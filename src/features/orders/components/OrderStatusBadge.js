@@ -1,6 +1,7 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { ORDER_STATUS_LABELS } from '@/domain/orders';
 import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/orderStatus';
 import { Text } from '@/shared/ui';
 
 /** Etiqueta con el color del estado del pedido (colores en shared/theme). */
@@ -13,11 +14,3 @@ export function OrderStatusBadge({ status }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.pill,
-  },
-});

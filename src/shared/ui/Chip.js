@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet } from 'react-native';
-import { theme } from '@/shared/theme';
+import { Pressable } from 'react-native';
+import { styles } from '@/shared/styles/components/chip';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -12,39 +12,22 @@ import { Text } from './Text';
  * @param {string} [props.icon]
  * @param {() => void} [props.onPress]
  */
-export function Chip({ label, selected = false, icon, onPress, style }) {
+export function Chip({ label, selected = false, icon, onPress, disabled = false, style }) {
   const content = selected ? 'textInverse' : 'textPrimary';
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      disabled={disabled}
+      accessibilityState={{ selected, disabled }}
       onPress={onPress}
-      style={[styles.chip, selected && styles.selected, style]}
+      style={({ pressed }) => [styles.chip, selected && styles.selected, pressed && styles.pressed, disabled && styles.disabled, style]}
     >
       {icon ? <Icon name={icon} size="sm" color={content} /> : null}
-      <Text variant="label" color={content}>
+      <Text variant="label" color={content} style={styles.label}>
         {label}
       </Text>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  chip: {
-    minHeight: 48,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.sm,
-  },
-  selected: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-});

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { ASSIGNABLE_ROLES, ROLE_LABELS, suggestUsername } from '@/domain/users';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { theme } from '@/shared/theme';
+import { commonStyles as styles } from '@/shared/styles/commonStyles';
 import { Banner, Button, Chip, Sheet, Text, TextField } from '@/shared/ui';
 
 /**
@@ -87,8 +87,3 @@ export function InviteFormSheet({ busy, onSubmit, onClose }) {
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  group: { gap: theme.spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-});

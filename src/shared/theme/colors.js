@@ -4,22 +4,22 @@
  */
 export const colors = {
   // Fondos
-  background: '#F4F5F7',
+  background: '#FCF7F0',
   surface: '#FFFFFF',
-  surfaceMuted: '#ECEEF1',
-  overlay: 'rgba(0, 0, 0, 0.45)',
+  surfaceMuted: '#F4EADF',
+  overlay: 'rgba(52, 37, 31, 0.48)',
 
   // Líneas
-  border: '#D9DDE3',
+  border: '#E8DED3',
 
   // Texto
-  textPrimary: '#1B1F24',
-  textSecondary: '#5B6470',
-  textInverse: '#FFFFFF',
+  textPrimary: '#34251F',
+  textSecondary: '#796B62',
+  textInverse: '#FBEEDD',
 
   // Marca / acciones
-  primary: '#E8590C',
-  primaryPressed: '#C94A08',
+  primary: '#C90000',
+  primaryPressed: '#A60000',
 
   // Identidad del inicio: originales de Soto's sobre superficies cálidas.
   brandRed: '#C90000',
@@ -35,25 +35,25 @@ export const colors = {
   brandOnRedSoft: 'rgba(251, 238, 221, 0.08)',
 
   // Semánticos
-  success: '#2F9E44',
-  warning: '#F08C00',
-  danger: '#E03131',
-  info: '#1C7ED6',
+  success: '#2F794C',
+  warning: '#946019',
+  danger: '#B82B2B',
+  info: '#3F6F93',
 
   // Versiones suaves para fondos de avisos, chips y selección
-  primarySoft: '#FFF0E6',
+  primarySoft: '#FCECE5',
   successSoft: '#EAF7EC',
-  warningSoft: '#FFF4E0',
+  warningSoft: '#FFF3D9',
   dangerSoft: '#FDECEC',
   infoSoft: '#E7F1FB',
 
   // Color de cada estado de pedido (las claves son los valores de ORDER_STATUS)
   status: {
-    draft: '#868E96',
-    new: '#1C7ED6',
-    in_progress: '#F08C00',
-    ready: '#2F9E44',
-    delivered: '#868E96',
-    cancelled: '#E03131',
+    draft: '#796B62',
+    new: '#3F6F93',
+    in_progress: '#946019',
+    ready: '#2F794C',
+    delivered: '#796B62',
+    cancelled: '#B82B2B',
   },
 };

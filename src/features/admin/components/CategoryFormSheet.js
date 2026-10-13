@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { MENU_ICONS } from '@/domain/menu';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/forms';
 import { Banner, Button, Chip, Sheet, Text, TextField, Toggle } from '@/shared/ui';
 import { DeleteSection } from './DeleteSection';
 
@@ -78,9 +78,3 @@ export function CategoryFormSheet({ category, productCount = 0, busy, error, onS
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  group: { gap: theme.spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  iconChip: { minWidth: 48, paddingHorizontal: theme.spacing.md },
-});

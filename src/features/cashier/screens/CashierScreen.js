@@ -1,17 +1,18 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { getExtrasForProduct, getProductsByCategory, getSellableCategories } from '@/domain/menu';
 import { ORDER_STATUS, createOrderItem, formatOrderNumber } from '@/domain/orders';
-import { SessionBar, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import { useMenu } from '@/features/menu/useMenu';
 import { useLiveOrders } from '@/features/orders/useLiveOrders';
 import { PERMISSIONS, can } from '@/domain/users';
 import { orderService } from '@/services';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
-import { Banner, Button, Chip, Screen, Spinner, Text } from '@/shared/ui';
+import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
+import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
+import { styles } from '@/shared/styles/screens/cashier';
+import { Banner, Button, Chip, Spinner, Text } from '@/shared/ui';
 import { NotesSheet } from '../components/NotesSheet';
 import { OrderSummary } from '../components/OrderSummary';
 import { ProductGrid } from '../components/ProductGrid';
@@ -19,7 +20,6 @@ import { ProductOptionsSheet } from '../components/ProductOptionsSheet';
 import { ReadyOrdersSheet } from '../components/ReadyOrdersSheet';
 import { useOrderDraft } from '../hooks/useOrderDraft';
 
-const WIDE_BREAKPOINT = 900;
 const READY_ONLY = [ORDER_STATUS.READY];
 const NOTICE_MS = 6000;
 
@@ -38,8 +38,9 @@ export default function CashierScreen() {
 
 function CashierWorkspace({ user }) {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const wide = width >= WIDE_BREAKPOINT;
+  const { split: wide } = useResponsiveLayout();
+  const workspaceScroll = useRef(null);
+  const summaryOffset = useRef(0);
 
   const { menu, loading, error: menuError } = useMenu();
   const draft = useOrderDraft(user);
@@ -114,6 +115,7 @@ function CashierWorkspace({ user }) {
   const summary = (
     <OrderSummary
       order={draft.order}
+      scrollable={wide}
       sending={sending}
       onQuantity={draft.setQuantity}
       onEditNotes={setNotesItemId}
@@ -124,29 +126,34 @@ function CashierWorkspace({ user }) {
     />
   );
 
-  return (
-    <Screen>
-      <View style={[commonStyles.rowBetween, styles.header]}>
-        <View style={commonStyles.row}>
-          {router.canGoBack() ? (
-            <Button compact variant="secondary" icon="arrow-back" label="Volver" onPress={() => router.back()} />
-          ) : null}
-          <Text variant="headline" style={styles.title}>
-            Caja
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Button
-            compact
-            variant={ready.orders.length > 0 ? 'primary' : 'secondary'}
-            icon="bag-check"
-            label={`Listos (${ready.orders.length})`}
-            onPress={() => setReadyOpen(true)}
-          />
-          <SessionBar />
-        </View>
+  const catalog = (
+    <View style={wide ? styles.catalog : styles.catalogNarrow}>
+      <View style={styles.catalogHeader}>
+        <Text variant="title">Nuestro menú</Text>
+        <Text variant="caption" color="textSecondary">{products.length} productos</Text>
       </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories} contentContainerStyle={styles.categoriesContent}>
+        {categories.map((category) => (
+          <Chip key={category.id} label={category.name} icon={category.icon ?? undefined} selected={category.id === activeCategoryId} onPress={() => setCategoryId(category.id)} />
+        ))}
+      </ScrollView>
+      <ProductGrid products={products} withOptions={withOptions} onPick={pickProduct} scrollable={wide} />
+    </View>
+  );
 
+  return (
+    <WorkspaceScreen
+      section="cashier"
+      title="Caja"
+      subtitle="Cada pedido empieza con una buena atención."
+      back={router.canGoBack()}
+      actions={
+        <>
+          {!wide ? <Button compact variant="secondary" icon="receipt-outline" label={`Ver pedido (${draft.order.totals.itemCount})`} onPress={() => workspaceScroll.current?.scrollTo({ y: summaryOffset.current, animated: true })} /> : null}
+          <Button compact variant={ready.orders.length ? 'primary' : 'secondary'} icon="bag-check-outline" label={`Listos (${ready.orders.length})`} onPress={() => setReadyOpen(true)} />
+        </>
+      }
+    >
       {notice ? <Banner tone="success" message={notice} style={styles.banner} onDismiss={() => setNotice(null)} /> : null}
       {error ? <Banner tone="error" message={error} style={styles.banner} onDismiss={() => setError(null)} /> : null}
       {menuError ? <Banner tone="error" message={getErrorMessage(menuError)} style={styles.banner} /> : null}
@@ -157,7 +164,7 @@ function CashierWorkspace({ user }) {
       {loading ? (
         <Spinner message="Cargando menú…" />
       ) : categories.length === 0 ? (
-        <View style={[commonStyles.card, styles.emptyMenu]}>
+        <View style={styles.emptyMenu}>
           <Text variant="title">Aún no hay productos en el menú</Text>
           <Text color="textSecondary" style={styles.emptyMenuText}>
             {can(user.role, PERMISSIONS.MENU_MANAGE)
@@ -169,24 +176,17 @@ function CashierWorkspace({ user }) {
           ) : null}
         </View>
       ) : (
-        <View style={[styles.body, !wide && styles.bodyNarrow]}>
-          <View style={styles.catalog}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories} contentContainerStyle={styles.categoriesContent}>
-              {categories.map((category) => (
-                <Chip
-                  key={category.id}
-                  label={category.name}
-                  icon={category.icon ?? undefined}
-                  selected={category.id === activeCategoryId}
-                  onPress={() => setCategoryId(category.id)}
-                />
-              ))}
-            </ScrollView>
-            <ProductGrid products={products} withOptions={withOptions} onPick={pickProduct} />
+        wide ? (
+          <View style={styles.body}>
+            {catalog}
+            <View style={styles.summaryWide}>{summary}</View>
           </View>
-
-          <View style={wide ? styles.summaryWide : styles.summaryNarrow}>{summary}</View>
-        </View>
+        ) : (
+          <ScrollView ref={workspaceScroll} contentContainerStyle={styles.bodyNarrow} keyboardShouldPersistTaps="handled">
+            {catalog}
+            <View style={styles.summaryNarrow} onLayout={(event) => { summaryOffset.current = event.nativeEvent.layout.y; }}>{summary}</View>
+          </ScrollView>
+        )
       )}
 
       {picked && menu ? (
@@ -224,22 +224,6 @@ function CashierWorkspace({ user }) {
           onClose={() => setReadyOpen(false)}
         />
       ) : null}
-    </Screen>
+    </WorkspaceScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { marginBottom: theme.spacing.lg, gap: theme.spacing.lg, flexWrap: 'wrap' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg },
-  title: { marginLeft: theme.spacing.lg },
-  banner: { marginBottom: theme.spacing.md },
-  body: { flex: 1, flexDirection: 'row', gap: theme.spacing.lg },
-  bodyNarrow: { flexDirection: 'column' },
-  catalog: { flex: 1, gap: theme.spacing.md },
-  categories: { flexGrow: 0 },
-  categoriesContent: { gap: theme.spacing.sm },
-  emptyMenu: { alignItems: 'center', gap: theme.spacing.md, alignSelf: 'center', maxWidth: 520 },
-  emptyMenuText: { textAlign: 'center' },
-  summaryWide: { width: 400 },
-  summaryNarrow: { flex: 1, minHeight: 320 },
-});

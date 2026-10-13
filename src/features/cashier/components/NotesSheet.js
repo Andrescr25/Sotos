@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { theme } from '@/shared/theme';
+import { View } from 'react-native';
+import { commonStyles as styles } from '@/shared/styles/commonStyles';
 import { Button, Chip, Sheet, TextField } from '@/shared/ui';
 
 /**
@@ -45,7 +45,3 @@ export function NotesSheet({ item, quickNotes, onSave, onClose }) {
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-});

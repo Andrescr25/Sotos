@@ -1,5 +1,6 @@
-import { StyleSheet, Switch, View } from 'react-native';
 import { theme } from '@/shared/theme';
+import { Platform, Switch, View } from 'react-native';
+import { styles } from '@/shared/styles/components/toggle';
 import { Text } from './Text';
 
 /**
@@ -14,18 +15,16 @@ import { Text } from './Text';
 export function Toggle({ label, value, onValueChange, disabled = false, style }) {
   return (
     <View style={[styles.row, style]}>
-      <Text variant="label">{label}</Text>
+      <Text variant="label" style={styles.label}>{label}</Text>
       <Switch
+        accessibilityLabel={label}
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: theme.colors.border, true: theme.colors.success }}
+        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
         thumbColor={theme.colors.surface}
+        {...(Platform.OS === 'web' ? { activeThumbColor: theme.colors.surface } : {})}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-});

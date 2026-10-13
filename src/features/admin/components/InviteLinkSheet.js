@@ -1,9 +1,9 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { ROLE_LABELS } from '@/domain/users';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/forms';
 import { Banner, Button, Sheet, Text, TextField } from '@/shared/ui';
 import { buildInviteMessage, buildInviteUrl, buildWhatsAppUrl } from '../inviteLink';
 
@@ -62,7 +62,7 @@ export function InviteLinkSheet({ user, invitation, onClose }) {
         }
       />
 
-      <View style={styles.group}>
+      <View style={styles.linkGroup}>
         <TextField label="Enlace" value={url} editable={false} selectTextOnFocus multiline />
         <Button
           icon={copied ? 'checkmark' : 'copy'}
@@ -81,7 +81,3 @@ export function InviteLinkSheet({ user, invitation, onClose }) {
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  group: { gap: theme.spacing.md },
-});

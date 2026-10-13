@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { PRODUCT_KIND, PRODUCT_KIND_LABELS } from '@/domain/menu';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { theme } from '@/shared/theme';
+import { commonStyles as styles } from '@/shared/styles/commonStyles';
 import { parseColones } from '@/shared/utils/money';
 import { Banner, Button, Chip, Sheet, Text, TextField, Toggle } from '@/shared/ui';
 import { DeleteSection } from './DeleteSection';
@@ -127,8 +127,3 @@ export function ProductFormSheet({ menu, product, defaultCategoryId, busy, error
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create({
-  group: { gap: theme.spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-});

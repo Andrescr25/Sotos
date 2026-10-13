@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   ORDER_STATUS,
   formatOrderNumber,
@@ -9,6 +9,7 @@ import { OrderItemsList } from '@/features/orders/components/OrderItemsList';
 import { OrderStatusBadge } from '@/features/orders/components/OrderStatusBadge';
 import { commonStyles } from '@/shared/styles/commonStyles';
 import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/kitchenOrderCard';
 import { formatClockTime, formatElapsed } from '@/shared/utils/time';
 import { Banner, Button, Icon, Text } from '@/shared/ui';
 import { KITCHEN_CONFIG } from '../config';
@@ -39,7 +40,7 @@ export function KitchenOrderCard({ order, now, action, hint, busy = false, onAct
   return (
     <View style={[commonStyles.card, styles.card, { borderLeftColor: accent }, justArrived && styles.arrived]}>
       <View style={commonStyles.rowBetween}>
-        <Text variant="headline">{formatOrderNumber(order.number)}</Text>
+        <Text variant="title">{formatOrderNumber(order.number)}</Text>
         <View style={[styles.timer, { backgroundColor: accent }]}>
           <Icon name="timer" size="sm" color="textInverse" />
           <Text variant="label" color="textInverse">
@@ -94,19 +95,3 @@ export function KitchenOrderCard({ order, now, action, hint, busy = false, onAct
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: { gap: theme.spacing.md, borderLeftWidth: 8 },
-  arrived: { backgroundColor: theme.colors.infoSoft },
-  timer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.pill,
-  },
-  customer: { fontWeight: theme.fontWeights.bold },
-  action: { minHeight: 64 },
-  hint: { textAlign: 'center' },
-});

@@ -44,6 +44,7 @@ src/
 │   ├── kitchen/    tablero de cocina
 │   ├── orders/     piezas compartidas: lista en vivo, detalle de líneas, estado
 │   ├── menu/       useMenu: el menú en vivo (lo usan Caja y Administración)
+│   ├── workspace/  marco compartido y navegación según los permisos
 │   └── admin/      inicio, usuarios y accesos, y gestión del menú
 │
 ├── services/       Casos de uso: combinan dominio + repositorios.
@@ -66,10 +67,10 @@ src/
 │
 └── shared/         Utilidades transversales, sin lógica de negocio.
     ├── theme/      Tokens de diseño (colores, espaciado, tipografía...)
-    ├── styles/     Estilos reutilizables
+    ├── styles/     commonStyles, components/, layout/, screens/, web/ (ver README)
     ├── ui/         Componentes base: Text, Button, TextField, Sheet, Stepper...
     ├── errors/     AppError y mensajes para el usuario
-    ├── hooks/      useNow
+    ├── hooks/      useNow, useResponsiveLayout
     └── utils/      money, time, createId, createEventEmitter, deepEqual
 
 public/             Archivos de la app web: index.html, manifest.json e íconos (PWA).
@@ -337,7 +338,7 @@ Administración cuando el administrador edita el menú: recargan solos).
 |---|---|
 | **Login** | Usuario y contraseña. Sin selector de rol y sin "Crear cuenta": las cuentas las crea el administrador. |
 | **Acceso pendiente** | Cuenta sin rol; se actualiza sola cuando el admin asigna acceso. |
-| **Caja** | Categorías → productos → (extras y observaciones) → resumen → enviar. Botón "Listos (n)" para entregar. En pantallas anchas (≥ 900 px) el resumen va a la derecha; en estrechas se apila debajo. |
+| **Caja** | Categorías → productos → (extras y observaciones) → resumen → enviar. Botón "Listos (n)" para entregar. Desde 960 px de espacio útil el resumen va a la derecha; en tamaños menores se apila debajo, con un acceso rápido «Ver pedido». |
 | **Cocina** | Tablero Nuevos / En preparación / Listos con tarjetas grandes: número, hora, tiempo transcurrido (verde/ámbar/rojo), líneas con extras y observaciones, botón del siguiente paso. |
 | **Administración** | Inicio con atajos y aviso de cuentas pendientes; "Usuarios y accesos" para invitar empleados, asignar rol, habilitar y restablecer contraseñas. |
 | **Invitación** (empleado) | `/invitacion/<token>`: saluda por nombre, muestra su acceso y pide crear la contraseña. Maneja enlace inválido, vencido o ya usado. |
@@ -356,11 +357,21 @@ márgenes ni tamaños de fuente sueltos.
 | Espaciados y radios | `shared/theme/spacing.js` |
 | Tamaño de textos (toda la app) | `shared/theme/typography.js` |
 | Tamaño mínimo de botones táctiles / iconos | `shared/theme/sizes.js` |
-| Apariencia de botones, textos, campos, ventanas | `shared/ui/*` |
+| Apariencia de controles y tarjetas | `shared/styles/components/*` |
+| Navegación y marco interior | `features/workspace/components/WorkspaceScreen.js` + `shared/styles/layout/workspace.js` |
+| Composición de cada pantalla | `shared/styles/screens/*` |
+| Umbrales responsive y anchos | `shared/theme/layout.js` + `shared/hooks/useResponsiveLayout.js` |
+| CSS global del navegador | `shared/styles/web/global.css` |
 | Patrones repetidos (tarjeta, fila...) | `shared/styles/commonStyles.js` |
 | Librería de iconos | `shared/ui/Icon.js` |
 | Cuándo una tarjeta de cocina se pone ámbar/roja | `features/kitchen/config.js` |
 | Textos de error para el usuario | `shared/errors/messages.js` |
+
+La organización y las reglas de reutilización se detallan en
+[`src/shared/styles/README.md`](../src/shared/styles/README.md). El CSS global
+solo se carga en web; los estilos de React Native y los tokens se comparten
+entre web, iOS y Android. Las vistas consideran el ancho útil y el tamaño del
+texto para elegir columnas o una composición apilada.
 
 ## 10. Cómo se agregan las funciones futuras
 

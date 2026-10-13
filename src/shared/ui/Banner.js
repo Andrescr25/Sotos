@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
 import { theme } from '@/shared/theme';
+import { Pressable, View } from 'react-native';
+import { styles } from '@/shared/styles/components/banner';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -36,14 +37,3 @@ export function Banner({ tone = 'info', message, onDismiss, style }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
-  },
-  message: { flex: 1 },
-});

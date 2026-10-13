@@ -1,5 +1,5 @@
-import { StyleSheet, View } from 'react-native';
-import { theme } from '@/shared/theme';
+import { View } from 'react-native';
+import { styles } from '@/shared/styles/components/orderItems';
 import { Text } from '@/shared/ui';
 
 /**
@@ -43,10 +43,3 @@ export function OrderItemsList({ items, size = 'normal' }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  list: { gap: theme.spacing.md },
-  item: { gap: theme.spacing.xs },
-  detail: { marginLeft: theme.spacing.lg },
-  note: { fontWeight: theme.fontWeights.bold },
-});

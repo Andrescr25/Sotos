@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { theme } from '@/shared/theme';
+import { View } from 'react-native';
+import { styles } from '@/shared/styles/components/deleteSection';
 import { Banner, Button } from '@/shared/ui';
 
 /**
@@ -50,9 +50,3 @@ export function DeleteSection({ itemLabel, note, busy, onConfirm }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  confirm: { gap: theme.spacing.md },
-  actions: { flexDirection: 'row', gap: theme.spacing.md },
-  action: { flex: 1 },
-});

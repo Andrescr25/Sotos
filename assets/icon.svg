@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Ícono de Sotos: plato, tenedor y cuchillo sobre el color de marca (#E8590C).
+  <!-- Ícono de Sotos: plato, tenedor y cuchillo sobre el color de marca (#C90000).
        Fuente de assets/icon.png y de los íconos de public/. Regenerar con scripts/generate-icons.sh -->
-  <rect width="1024" height="1024" fill="#E8590C"/>
+  <rect width="1024" height="1024" fill="#C90000"/>
 
   <!-- plato -->
-  <circle cx="512" cy="512" r="215" fill="#FFFFFF"/>
-  <circle cx="512" cy="512" r="165" fill="#E8590C"/>
-  <circle cx="512" cy="512" r="120" fill="#FFFFFF"/>
+  <circle cx="512" cy="512" r="215" fill="#FBEEDD"/>
+  <circle cx="512" cy="512" r="165" fill="#C90000"/>
+  <circle cx="512" cy="512" r="120" fill="#FBEEDD"/>
 
   <!-- tenedor -->
-  <g fill="#FFFFFF">
+  <g fill="#FBEEDD">
     <rect x="140" y="230" width="22" height="200" rx="11"/>
     <rect x="189" y="230" width="22" height="200" rx="11"/>
     <rect x="238" y="230" width="22" height="200" rx="11"/>
@@ -18,7 +18,7 @@
   </g>
 
   <!-- cuchillo -->
-  <g fill="#FFFFFF">
+  <g fill="#FBEEDD">
     <path d="M868 230 V560 H812 V330 C812 270 834 230 868 230 Z"/>
     <rect x="818" y="540" width="44" height="250" rx="22"/>
   </g>

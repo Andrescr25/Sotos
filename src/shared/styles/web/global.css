@@ -1,0 +1,37 @@
+/* Solo comportamiento del navegador. Colores inyectados desde shared/theme. */
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  background: var(--sotos-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+#root {
+  display: flex;
+  flex: 1;
+}
+::selection {
+  color: var(--sotos-primary);
+  background: var(--sotos-primarySoft);
+}
+[role="button"]:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--sotos-primary);
+  outline-offset: 3px;
+}
+input, textarea {
+  min-width: 0;
+  font: inherit;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sotos-border) transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+  }
+}

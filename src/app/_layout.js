@@ -4,6 +4,7 @@ import { AREAS, canAccessArea, hasAccess } from '@/domain/users';
 import { AuthProvider, useAuth } from '@/features/auth';
 import UnavailableScreen from '@/features/auth/screens/UnavailableScreen';
 import { theme } from '@/shared/theme';
+import { GlobalStyles } from '@/shared/styles/GlobalStyles';
 import { Spinner } from '@/shared/ui';
 
 /**
@@ -55,6 +56,7 @@ function AppStack() {
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <GlobalStyles />
       <StatusBar style="dark" />
       <AppStack />
     </AuthProvider>

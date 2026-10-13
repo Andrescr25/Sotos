@@ -1,67 +1,67 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, Pressable, View } from 'react-native';
 import { PRODUCT_KIND } from '@/domain/menu';
+import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
 import { commonStyles } from '@/shared/styles/commonStyles';
+import { styles } from '@/shared/styles/components/productGrid';
 import { theme } from '@/shared/theme';
 import { formatColones } from '@/shared/utils/money';
-import { Icon, Text } from '@/shared/ui';
+import { EmptyState, Icon, Text } from '@/shared/ui';
 
-/**
- * Productos de la categoría elegida. Un toque agrega una unidad; si el
- * producto tiene extras se abre la ventana de opciones.
- *
- * @param {Object} props
- * @param {import('@/domain/menu/types').Product[]} props.products
- * @param {Set<string> | string[]} props.withOptions  ids de productos con extras disponibles
- * @param {(product: import('@/domain/menu/types').Product) => void} props.onPick
- */
-export function ProductGrid({ products, withOptions, onPick }) {
-  const optionIds = new Set(withOptions);
+/** La cuadrícula se calcula sobre su ancho real, incluyendo el panel del pedido. */
+export function ProductGrid({ products, withOptions, onPick, scrollable = true }) {
+  const [width, setWidth] = useState(0);
+  const { fontScale } = useResponsiveLayout();
+  const optionIds = useMemo(() => new Set(withOptions), [withOptions]);
+  const minWidth = (width / fontScale < theme.layout.mobileBreakpoint
+    ? theme.layout.productMobileMinWidth : theme.layout.productMinWidth) * fontScale;
+  const columns = Math.max(1, Math.min(theme.layout.productMaxColumns, Math.floor((width + theme.spacing.md) / (minWidth + theme.spacing.md))));
+  const cardWidth = width > 0 ? (width - theme.spacing.md * (columns - 1)) / columns : undefined;
+  const empty = <EmptyState title="Sin productos en esta categoría" message="Elige otra categoría para continuar." />;
+
+  function renderProduct(product) {
+    return (
+      <Pressable
+        key={product.id}
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name}, ${formatColones(product.price)}`}
+        onPress={() => onPick(product)}
+        style={({ pressed }) => [commonStyles.card, styles.card, { width: cardWidth }, pressed && styles.pressed]}
+      >
+        <View style={styles.top}>
+          <View style={commonStyles.iconWell}><Icon name={product.kind === PRODUCT_KIND.DRINK ? 'cafe-outline' : 'fast-food-outline'} color="primary" /></View>
+          {optionIds.has(product.id) ? <Icon name="options-outline" size="sm" color="textSecondary" /> : null}
+        </View>
+        <View style={commonStyles.group}>
+          <Text style={styles.name}>{product.name}</Text>
+          <Text color="textSecondary" style={styles.hint}>{optionIds.has(product.id) ? 'Con extras' : 'Listo para agregar'}</Text>
+        </View>
+        <View style={styles.bottom}>
+          <Text style={styles.price}>{formatColones(product.price)}</Text>
+          <Icon name="add-circle-outline" size="sm" color="primary" />
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
-    <ScrollView contentContainerStyle={styles.grid}>
-      {products.map((product) => (
-        <Pressable
-          key={product.id}
-          accessibilityRole="button"
-          accessibilityLabel={`${product.name}, ${formatColones(product.price)}`}
-          onPress={() => onPick(product)}
-          style={({ pressed }) => [commonStyles.card, styles.card, pressed && styles.pressed]}
-        >
-          <Icon
-            name={product.kind === PRODUCT_KIND.DRINK ? 'cafe' : 'fast-food'}
-            size="lg"
-            color="primary"
-          />
-          <Text variant="bodyLarge" style={styles.name}>
-            {product.name}
-          </Text>
-          <Text variant="title">{formatColones(product.price)}</Text>
-          {optionIds.has(product.id) ? (
-            <Text variant="caption" color="textSecondary">
-              Con extras
-            </Text>
-          ) : null}
-        </Pressable>
-      ))}
-    </ScrollView>
+    <View style={[styles.container, scrollable && styles.fill]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {scrollable ? (
+        <FlatList
+          key={columns}
+          data={products}
+          numColumns={columns}
+          keyExtractor={(product) => product.id}
+          renderItem={({ item }) => renderProduct(item)}
+          ListEmptyComponent={empty}
+          columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
+          contentContainerStyle={styles.gridList}
+          style={styles.fill}
+          keyboardShouldPersistTaps="handled"
+        />
+      ) : (
+        <View style={styles.grid}>{products.length ? products.map(renderProduct) : empty}</View>
+      )}
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
-    paddingBottom: theme.spacing.xl,
-  },
-  card: {
-    flexGrow: 1,
-    flexBasis: 170,
-    maxWidth: 260,
-    minHeight: 150,
-    gap: theme.spacing.xs,
-    justifyContent: 'space-between',
-  },
-  pressed: { backgroundColor: theme.colors.primarySoft },
-  name: { fontWeight: theme.fontWeights.bold },
-});

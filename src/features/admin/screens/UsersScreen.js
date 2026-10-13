@@ -1,12 +1,12 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from '@/domain/users';
-import { SessionBar, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
-import { Banner, Button, Chip, Screen, Spinner, Text, Toggle } from '@/shared/ui';
+import { styles } from '@/shared/styles/screens/users';
+import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
+import { Banner, Button, Chip, Spinner, Text, Toggle } from '@/shared/ui';
 import { InviteFormSheet } from '../components/InviteFormSheet';
 import { InviteLinkSheet } from '../components/InviteLinkSheet';
 import { useUsers } from '../hooks/useUsers';
@@ -17,7 +17,6 @@ import { useUsers } from '../hooks/useUsers';
  * generar un enlace nuevo si alguien olvidó su contraseña.
  */
 export default function UsersScreen() {
-  const router = useRouter();
   const { user: me } = useAuth();
   const {
     users,
@@ -50,20 +49,7 @@ export default function UsersScreen() {
   }
 
   return (
-    <Screen>
-      <View style={[commonStyles.rowBetween, styles.header]}>
-        <View style={commonStyles.row}>
-          <Button compact variant="secondary" icon="arrow-back" label="Volver" onPress={() => router.back()} />
-          <Text variant="headline" style={styles.title}>
-            Usuarios y accesos
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Button compact icon="person-add" label="Invitar empleado" onPress={() => setInviting(true)} />
-          <SessionBar />
-        </View>
-      </View>
-
+    <WorkspaceScreen section="users" title="Usuarios y accesos" subtitle="Un buen equipo empieza con las personas." back actions={<Button compact icon="person-add-outline" label="Invitar empleado" onPress={() => setInviting(true)} />}>
       {pendingCount > 0 ? (
         <Banner
           tone="warning"
@@ -117,6 +103,7 @@ export default function UsersScreen() {
                   <View style={styles.roles}>
                     <Chip
                       label="Sin acceso"
+                      disabled={busy || isMe}
                       selected={!account.role}
                       onPress={() => account.role && !busy && !isMe && assignRole(account.id, null)}
                     />
@@ -124,6 +111,7 @@ export default function UsersScreen() {
                       <Chip
                         key={role}
                         label={ROLE_LABELS[role]}
+                        disabled={busy || isMe}
                         selected={account.role === role}
                         onPress={() => account.role !== role && !busy && !isMe && assignRole(account.id, role)}
                       />
@@ -168,21 +156,6 @@ export default function UsersScreen() {
       {issued ? (
         <InviteLinkSheet user={issued.user} invitation={issued.invitation} onClose={() => setIssued(null)} />
       ) : null}
-    </Screen>
+    </WorkspaceScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { marginBottom: theme.spacing.lg, gap: theme.spacing.lg, flexWrap: 'wrap' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg },
-  title: { marginLeft: theme.spacing.lg },
-  banner: { marginBottom: theme.spacing.md },
-  list: { gap: theme.spacing.md, paddingBottom: theme.spacing.xl },
-  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: theme.spacing.lg },
-  pending: { backgroundColor: theme.colors.warningSoft },
-  disabled: { opacity: 0.6 },
-  identity: { flexGrow: 1, flexShrink: 1, minWidth: 220, gap: theme.spacing.xs },
-  name: { fontWeight: theme.fontWeights.bold },
-  controls: { gap: theme.spacing.md, alignItems: 'flex-end', flexShrink: 1 },
-  roles: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, justifyContent: 'flex-end' },
-});

@@ -1,5 +1,7 @@
-import { StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
 import { theme } from '@/shared/theme';
+import { TextInput, View } from 'react-native';
+import { styles } from '@/shared/styles/components/textField';
 import { Text } from './Text';
 
 /**
@@ -11,10 +13,11 @@ import { Text } from './Text';
  * @param {string} [props.error]
  */
 export function TextField({ label, error, style, multiline, ...inputProps }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={[styles.wrapper, style]}>
       {label ? (
-        <Text variant="label" color="textSecondary">
+        <Text variant="label" style={styles.label}>
           {label}
         </Text>
       ) : null}
@@ -24,8 +27,10 @@ export function TextField({ label, error, style, multiline, ...inputProps }) {
         autoCapitalize="none"
         autoCorrect={false}
         multiline={multiline}
-        style={[styles.input, multiline && styles.multiline, error && styles.inputError]}
+        style={[styles.input, multiline && styles.multiline, focused && styles.focused, error && styles.inputError]}
         {...inputProps}
+        onFocus={(event) => { setFocused(true); inputProps.onFocus?.(event); }}
+        onBlur={(event) => { setFocused(false); inputProps.onBlur?.(event); }}
       />
       {error ? (
         <Text variant="caption" color="danger">
@@ -35,23 +40,3 @@ export function TextField({ label, error, style, multiline, ...inputProps }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: { gap: theme.spacing.xs },
-  input: {
-    minHeight: theme.sizes.touchTarget,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSizes.body,
-  },
-  multiline: {
-    minHeight: theme.sizes.touchTarget * 1.6,
-    paddingTop: theme.spacing.md,
-    textAlignVertical: 'top',
-  },
-  inputError: { borderColor: theme.colors.danger },
-});

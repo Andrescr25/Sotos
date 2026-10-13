@@ -1,9 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { calculateItemTotal, isValidCustomerName } from '@/domain/orders';
 import { commonStyles } from '@/shared/styles/commonStyles';
-import { theme } from '@/shared/theme';
+import { styles } from '@/shared/styles/components/orderSummary';
 import { formatColones } from '@/shared/utils/money';
-import { Banner, Button, Icon, Stepper, Text, TextField } from '@/shared/ui';
+import { Banner, Button, EmptyState, Icon, Stepper, Text, TextField } from '@/shared/ui';
 
 /**
  * Resumen del pedido en construcción: líneas con su cantidad, extras y
@@ -28,93 +28,93 @@ export function OrderSummary({
   onNoteChange,
   onCustomerChange,
   onSend,
+  scrollable = true,
 }) {
+  const Details = scrollable ? ScrollView : View;
   const empty = order.items.length === 0;
   const hasName = isValidCustomerName(order.customerName);
 
   return (
-    <View style={[commonStyles.card, styles.panel]}>
+    <View style={[commonStyles.card, styles.panel, scrollable && styles.fill]}>
       <View style={commonStyles.rowBetween}>
         <Text variant="title">Pedido actual</Text>
         <Text color="textSecondary">{order.totals.itemCount} unidades</Text>
       </View>
 
-      <TextField
-        label="Nombre del cliente *"
-        value={order.customerName}
-        onChangeText={onCustomerChange}
-        autoCapitalize="words"
-        placeholder="¿A nombre de quién va la cuenta?"
-        error={!hasName && !empty ? 'Obligatorio para enviar el pedido' : undefined}
-      />
+      <Details style={scrollable ? styles.details : styles.detailsContent} contentContainerStyle={scrollable ? styles.detailsContent : undefined} keyboardShouldPersistTaps="handled">
+        <TextField
+          label="Nombre del cliente *"
+          value={order.customerName}
+          onChangeText={onCustomerChange}
+          autoCapitalize="words"
+          placeholder="¿A nombre de quién va la cuenta?"
+          error={!hasName && !empty ? 'Obligatorio para enviar el pedido' : undefined}
+        />
 
-      {empty ? (
-        <View style={styles.empty}>
-          <Icon name="receipt" size="lg" color="textSecondary" />
-          <Text color="textSecondary" style={styles.emptyText}>
-            Toca un producto para agregarlo al pedido.
-          </Text>
-        </View>
-      ) : (
-        <ScrollView style={styles.lines} contentContainerStyle={styles.linesContent}>
-          {order.items.map((item) => (
-            <View key={item.id} style={styles.line}>
-              <View style={commonStyles.rowBetween}>
-                <Text variant="bodyLarge" style={styles.lineName}>
-                  {item.quantity} × {item.name}
-                </Text>
-                <Text variant="bodyLarge">{formatColones(calculateItemTotal(item))}</Text>
-              </View>
+        {empty ? (
+          <EmptyState title="Tu pedido empieza aquí" message="Toca un producto para agregarlo al pedido." />
+        ) : (
+          <View style={styles.linesContent}>
+            {order.items.map((item) => (
+              <View key={item.id} style={styles.line}>
+                <View style={commonStyles.rowBetween}>
+                  <Text variant="bodyLarge" style={styles.lineName}>
+                    {item.quantity} × {item.name}
+                  </Text>
+                  <Text variant="bodyLarge">{formatColones(calculateItemTotal(item))}</Text>
+                </View>
 
-              {item.extras.map((extra) => (
-                <Text key={extra.extraId} color="textSecondary" style={styles.detail}>
-                  + {extra.quantity} × {extra.name} ({formatColones(extra.unitPrice * extra.quantity)})
-                </Text>
-              ))}
-              {item.notes.map((note) => (
-                <Text key={note} color="danger" style={styles.detail}>
-                  • {note}
-                </Text>
-              ))}
+                {item.extras.map((extra) => (
+                  <Text key={extra.extraId} color="textSecondary" style={styles.detail}>
+                    + {extra.quantity} × {extra.name} ({formatColones(extra.unitPrice * extra.quantity)})
+                  </Text>
+                ))}
+                {item.notes.map((note) => (
+                  <Text key={note} color="danger" style={styles.detail}>
+                    • {note}
+                  </Text>
+                ))}
 
-              <View style={styles.lineActions}>
-                <Stepper value={item.quantity} min={0} onChange={(value) => onQuantity(item.id, value)} />
-                <View style={commonStyles.row}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Observaciones de ${item.name}`}
-                    onPress={() => onEditNotes(item.id)}
-                    style={styles.iconButton}
-                  >
-                    <Icon name="chatbubble-ellipses" color="textSecondary" />
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Quitar ${item.name}`}
-                    onPress={() => onRemove(item.id)}
-                    style={styles.iconButton}
-                  >
-                    <Icon name="trash" color="danger" />
-                  </Pressable>
+                <View style={styles.lineActions}>
+                  <Stepper value={item.quantity} min={0} onChange={(value) => onQuantity(item.id, value)} />
+                  <View style={commonStyles.row}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Observaciones de ${item.name}`}
+                      onPress={() => onEditNotes(item.id)}
+                      style={styles.iconButton}
+                    >
+                      <Icon name="chatbubble-ellipses" color="textSecondary" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Quitar ${item.name}`}
+                      onPress={() => onRemove(item.id)}
+                      style={styles.iconButton}
+                    >
+                      <Icon name="trash" color="danger" />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
+            ))}
+          </View>
+        )}
 
-      <TextField
-        placeholder="Nota para todo el pedido (opcional)"
-        value={order.note}
-        onChangeText={onNoteChange}
-        autoCapitalize="sentences"
-      />
+        <TextField
+          placeholder="Nota para todo el pedido (opcional)"
+          value={order.note}
+          onChangeText={onNoteChange}
+          autoCapitalize="sentences"
+        />
+
+      </Details>
 
       <View style={commonStyles.divider} />
 
       <View style={commonStyles.rowBetween}>
         <Text variant="title">Total</Text>
-        <Text variant="headline">{formatColones(order.totals.total)}</Text>
+        <Text variant="headline" color="primary">{formatColones(order.totals.total)}</Text>
       </View>
 
       {empty ? <Banner tone="info" message="Agrega productos para poder enviar el pedido." /> : null}
@@ -132,35 +132,3 @@ export function OrderSummary({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  panel: { flex: 1, gap: theme.spacing.md },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, minHeight: 140 },
-  emptyText: { textAlign: 'center' },
-  lines: { flex: 1 },
-  linesContent: { gap: theme.spacing.lg },
-  line: {
-    gap: theme.spacing.xs,
-    paddingBottom: theme.spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  lineName: { flex: 1, fontWeight: theme.fontWeights.bold },
-  detail: { marginLeft: theme.spacing.lg },
-  lineActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing.sm,
-  },
-  iconButton: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceMuted,
-    marginLeft: theme.spacing.sm,
-  },
-  send: { minHeight: 64 },
-});
