@@ -27,7 +27,7 @@ export function LoginBrandPanel({ wide, large, compact }) {
           color="brandCream"
           style={[styles.headline, !large && styles.headlineTablet, !wide && styles.headlineMobile]}
         >
-          {wide ? 'Cada pedido,\nun gran servicio.' : 'Cada pedido, un gran servicio.'}
+          El todo a mil de los ticos
         </Text>
         <Text color="brandOnRedMuted" style={styles.description}>
           {wide
