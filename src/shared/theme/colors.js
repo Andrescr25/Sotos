@@ -21,6 +21,19 @@ export const colors = {
   primary: '#E8590C',
   primaryPressed: '#C94A08',
 
+  // Identidad del inicio: originales de Soto's sobre superficies cálidas.
+  brandRed: '#C90000',
+  brandRedPressed: '#A60000',
+  brandCream: '#FBEEDD',
+  brandCanvas: '#FCF7F0',
+  brandInk: '#34251F',
+  brandMuted: '#796B62',
+  brandBorder: '#E8DED3',
+  brandTint: '#F4EADF',
+  brandOnRedMuted: 'rgba(251, 238, 221, 0.76)',
+  brandOnRedBorder: 'rgba(251, 238, 221, 0.25)',
+  brandOnRedSoft: 'rgba(251, 238, 221, 0.08)',
+
   // Semánticos
   success: '#2F9E44',
   warning: '#F08C00',

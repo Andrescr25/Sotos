@@ -3,6 +3,7 @@ import { shadows } from './shadows';
 import { sizes } from './sizes';
 import { radius, spacing } from './spacing';
 import { fontSizes, fontWeights } from './typography';
+import { auth } from './auth';
 
 /**
  * Único punto de entrada de los tokens de diseño:
@@ -16,4 +17,5 @@ export const theme = {
   fontWeights,
   sizes,
   shadows,
+  auth,
 };
