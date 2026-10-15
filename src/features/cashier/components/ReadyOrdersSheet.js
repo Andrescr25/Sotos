@@ -13,9 +13,10 @@ import { Button, Sheet, Text } from '@/shared/ui';
  * @param {import('@/domain/orders/order').Order[]} props.orders
  * @param {string | null} props.busyId
  * @param {(order: import('@/domain/orders/order').Order) => void} props.onDeliver
+ * @param {(order: import('@/domain/orders/order').Order) => void} [props.onPrint]
  * @param {() => void} props.onClose
  */
-export function ReadyOrdersSheet({ orders, busyId, onDeliver, onClose }) {
+export function ReadyOrdersSheet({ orders, busyId, onDeliver, onPrint, onClose }) {
   return (
     <Sheet visible title="Listos para entregar" onClose={onClose}>
       {orders.length === 0 ? (
@@ -31,6 +32,7 @@ export function ReadyOrdersSheet({ orders, busyId, onDeliver, onClose }) {
               <Text variant="title">{order.customerName}</Text>
             ) : null}
             <OrderItemsList items={order.items} />
+            {onPrint ? <Button variant="secondary" icon="print-outline" label={`Imprimir comprobante ${formatOrderNumber(order.number)}`} onPress={() => onPrint(order)} /> : null}
             <Button
               icon="bag-check"
               label={busyId === order.id ? 'Un momento…' : 'Marcar como entregado'}

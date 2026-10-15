@@ -10,6 +10,7 @@ shared/styles/
 ├── components/         Estilos de controles, tarjetas y formularios
 ├── layout/             Marco y navegación del espacio de trabajo
 ├── screens/            Composición específica de cada pantalla interna
+├── print/              CSS del documento térmico separado de Caja
 ├── web/global.css      Base del navegador: raíz, foco, selección, scroll
 ├── GlobalStyles.web.js Variables CSS generadas desde los tokens de color
 └── GlobalStyles.js     Entrada nativa; los estilos se aplican con StyleSheet
@@ -37,3 +38,6 @@ táctil mínima de 48 px y los botones principales de 56 px.
 El CSS global se carga solo en web desde la raíz de Expo Router; las variables
 `--sotos-*` vienen de `theme.colors`. Los estilos de pantalla y componentes usan
 `StyleSheet` para compartir la misma interfaz entre web, iOS y Android.
+
+Los tickets usan `theme.printing` y `print/receipt.js`. El navegador imprime un
+documento separado, por lo que el CSS del ticket no cambia las otras pantallas.

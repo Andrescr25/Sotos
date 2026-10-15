@@ -18,6 +18,7 @@ import { OrderSummary } from '../components/OrderSummary';
 import { ProductGrid } from '../components/ProductGrid';
 import { ProductOptionsSheet } from '../components/ProductOptionsSheet';
 import { ReadyOrdersSheet } from '../components/ReadyOrdersSheet';
+import { ReceiptSheet } from '../components/ReceiptSheet';
 import { useOrderDraft } from '../hooks/useOrderDraft';
 
 const READY_ONLY = [ORDER_STATUS.READY];
@@ -41,6 +42,7 @@ function CashierWorkspace({ user }) {
   const { split: wide } = useResponsiveLayout();
   const workspaceScroll = useRef(null);
   const summaryOffset = useRef(0);
+  const sendingRef = useRef(false);
 
   const { menu, loading, error: menuError } = useMenu();
   const draft = useOrderDraft(user);
@@ -53,6 +55,8 @@ function CashierWorkspace({ user }) {
   const [sending, setSending] = useState(false);
   const [deliveringId, setDeliveringId] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [lastSentOrder, setLastSentOrder] = useState(null);
+  const [receiptOrder, setReceiptOrder] = useState(null);
   const [error, setError] = useState(null);
 
   const categories = useMemo(() => (menu ? getSellableCategories(menu) : []), [menu]);
@@ -82,6 +86,8 @@ function CashierWorkspace({ user }) {
   }
 
   async function send() {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     setError(null);
     setNotice(null);
@@ -89,10 +95,13 @@ function CashierWorkspace({ user }) {
       const sent = await orderService.sendToKitchen(draft.order, user);
       setNotice(`Pedido ${formatOrderNumber(sent.number)} de ${sent.customerName} enviado a cocina.`);
       draft.reset();
+      setLastSentOrder(sent);
+      setReceiptOrder(sent);
     } catch (caught) {
       // El borrador se conserva: se puede reintentar sin volver a armarlo.
       setError(getErrorMessage(caught));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -150,6 +159,7 @@ function CashierWorkspace({ user }) {
       actions={
         <>
           {!wide ? <Button compact variant="secondary" icon="receipt-outline" label={`Ver pedido (${draft.order.totals.itemCount})`} onPress={() => workspaceScroll.current?.scrollTo({ y: summaryOffset.current, animated: true })} /> : null}
+          {lastSentOrder ? <Button compact variant="secondary" icon="print-outline" label={`Comprobante ${formatOrderNumber(lastSentOrder.number)}`} onPress={() => setReceiptOrder(lastSentOrder)} /> : null}
           <Button compact variant={ready.orders.length ? 'primary' : 'secondary'} icon="bag-check-outline" label={`Listos (${ready.orders.length})`} onPress={() => setReadyOpen(true)} />
         </>
       }
@@ -216,11 +226,14 @@ function CashierWorkspace({ user }) {
         />
       ) : null}
 
+      {receiptOrder ? <ReceiptSheet key={receiptOrder.id} order={receiptOrder} onClose={() => setReceiptOrder(null)} /> : null}
+
       {readyOpen ? (
         <ReadyOrdersSheet
           orders={ready.orders}
           busyId={deliveringId}
           onDeliver={deliver}
+          onPrint={(order) => { setReadyOpen(false); setReceiptOrder(order); }}
           onClose={() => setReadyOpen(false)}
         />
       ) : null}

@@ -5,6 +5,7 @@ import { radius, spacing } from './spacing';
 import { fontSizes, fontWeights } from './typography';
 import { auth } from './auth';
 import { layout } from './layout';
+import { printing } from './printing';
 
 /**
  * Único punto de entrada de los tokens de diseño:
@@ -20,4 +21,5 @@ export const theme = {
   shadows,
   auth,
   layout,
+  printing,
 };

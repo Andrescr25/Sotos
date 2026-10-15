@@ -40,6 +40,13 @@ const MESSAGES = {
   category_not_empty: 'La categoría todavía tiene productos. Elimínalos o muévelos primero (o desactívala).',
   menu_not_empty: 'El menú de ejemplo solo se puede cargar cuando el menú está vacío.',
 
+  // Impresión
+  receipt_not_sent: 'Primero envía el pedido a cocina para generar su comprobante.',
+  receipt_invalid_paper: 'Elige papel de 58 u 80 mm.',
+  print_popup_blocked: 'Permite las ventanas emergentes de este sitio e intenta imprimir de nuevo. El pedido ya está en cocina.',
+  print_failed: 'No se pudo abrir la impresión. En la pestaña del comprobante usa el menú de Chrome → Compartir → Imprimir, o intenta de nuevo desde aquí.',
+  print_unsupported: 'Abre el sistema en Chrome en tu tablet para imprimir el comprobante.',
+
   // Pedidos
   empty_order: 'Agrega al menos un producto antes de enviar.',
   customer_name_required: 'Escribe el nombre del cliente para poder enviar el pedido.',

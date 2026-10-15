@@ -13,6 +13,8 @@ import PendingAccessScreen from '@/features/auth/screens/PendingAccessScreen';
 import CashierScreen from '@/features/cashier/screens/CashierScreen';
 import KitchenScreen from '@/features/kitchen/screens/KitchenScreen';
 import { authService, orderService } from '@/services';
+import { AppError } from '@/shared/errors/AppError';
+import { browserPrinter } from '@/shared/printing/browserPrinter';
 
 const mockRouter = {
   replace: jest.fn(),
@@ -23,6 +25,10 @@ const mockRouter = {
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
+}));
+
+jest.mock('@/shared/printing/browserPrinter', () => ({
+  browserPrinter: { supported: true, printDocument: jest.fn(() => ({ status: 'dialog-opened' })) },
 }));
 
 const renderWithAuth = (screenElement) => render(<AuthProvider>{screenElement}</AuthProvider>);
@@ -152,9 +158,30 @@ describe('flujo caja → cocina → entrega', () => {
 
     await press('Enviar pedido a cocina');
 
-    expect(await screen.findByText('Pedido #001 de Ana Mora enviado a cocina.')).toBeTruthy();
-    expect(screen.getByText('Agrega productos para poder enviar el pedido.')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Imprimir comprobante' })).toBeTruthy();
+    await press('Imprimir comprobante');
+    expect(browserPrinter.printDocument).toHaveBeenCalledTimes(1);
+    const html = browserPrinter.printDocument.mock.calls[0][0];
+    expect(html).toContain('Ana Mora');
+    expect(html).toContain('₡8.500');
+    expect(html).toContain('No es una factura electrónica.');
     expect(await orderService.listKitchenOrders()).toHaveLength(1);
+
+    // Una falla al imprimir no toca el pedido ya confirmado ni obliga a reenviar.
+    browserPrinter.printDocument.mockImplementationOnce(() => { throw new AppError('print_popup_blocked', 'Blocked'); });
+    await press('Imprimir comprobante');
+    expect(await screen.findByText(/Permite las ventanas emergentes/)).toBeTruthy();
+    expect(await orderService.listKitchenOrders()).toHaveLength(1);
+    await press('Seguir tomando pedidos');
+    expect(screen.getByText('Agrega productos para poder enviar el pedido.')).toBeTruthy();
+
+    // El acceso al último comprobante sigue disponible al empezar otra cuenta.
+    await press('Comprobante #001');
+    await press('58 mm');
+    await press('Imprimir comprobante');
+    expect(browserPrinter.printDocument.mock.calls.at(-1)[0]).toContain('papel de 58 mm');
+    expect(await orderService.listKitchenOrders()).toHaveLength(1);
+    await press('Seguir tomando pedidos');
   });
 
   it('cocina recibe el pedido y lo avanza hasta "listo"', async () => {
@@ -183,9 +210,37 @@ describe('flujo caja → cocina → entrega', () => {
     expect(await screen.findByText('Listos para entregar')).toBeTruthy();
     expect(screen.getByText('Ana Mora')).toBeTruthy();
 
+    await press('Imprimir comprobante #001');
+    expect(await screen.findByRole('button', { name: 'Imprimir comprobante' })).toBeTruthy();
+    await press('Seguir tomando pedidos');
+    await press('Listos (1)');
     await press('Marcar como entregado');
 
     expect(await screen.findByText('No hay pedidos listos por ahora.')).toBeTruthy();
     expect(await orderService.listKitchenOrders()).toHaveLength(0);
+  });
+});
+
+
+describe('impresión al confirmar un pedido', () => {
+  it('conserva el borrador y no ofrece imprimir cuando falla el envío', async () => {
+    await signInAs('cajero', 'cajero123');
+    await renderWithAuth(<CashierScreen />);
+    await screen.findByRole('button', { name: /Hamburguesa clásica/ });
+    await press('Bebidas');
+    await press(/Coca-Cola/);
+    await fireEvent.changeText(screen.getByLabelText('Nombre del cliente *'), 'María');
+    const send = jest.spyOn(orderService, 'sendToKitchen').mockRejectedValueOnce(new AppError('network', 'Offline'));
+    try {
+      await press('Enviar pedido a cocina');
+      expect(await screen.findByText('No hay conexión con el servidor. Revisa el WiFi e intenta de nuevo.')).toBeTruthy();
+      expect(screen.getByLabelText('Nombre del cliente *').props.value).toBe('María');
+      expect(screen.getByText('1 × Coca-Cola')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Imprimir comprobante' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Comprobante #/ })).toBeNull();
+    } finally {
+      send.mockRestore();
+      await authService.logout();
+    }
   });
 });

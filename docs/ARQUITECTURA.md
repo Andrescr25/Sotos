@@ -9,7 +9,8 @@ existen, cómo fluye un pedido y dónde se enchufan las funciones futuras.
 observaciones, cálculo de totales, envío a cocina, estados, quién tomó el
 pedido y cuándo, cuentas con acceso asignado por el administrador, pantallas de
 caja, cocina, administración de usuarios y **gestión del menú** (platillos,
-bebidas, extras, categorías y observaciones frecuentes).
+bebidas, extras, categorías y observaciones frecuentes), e impresión opcional
+de comprobantes de pedidos enviados desde Chrome Android.
 
 **No incluye todavía:** facturación, inventario, reportes, cierres de caja,
 contabilidad, mesas, pagos, división de cuentas, delivery.
@@ -345,6 +346,18 @@ Administración cuando el administrador edita el menú: recargan solos).
 | **Menú** (administrador) | Pestañas *Platillos y bebidas*, *Extras*, *Categorías* y *Observaciones*: crear, editar, ocultar, ordenar con flechas y eliminar con confirmación. Si el menú está vacío ofrece crear la primera categoría o cargar un menú de ejemplo. Caja ve los cambios al instante. |
 
 Los umbrales de color de la cocina están en `features/kitchen/config.js`.
+
+### Impresión del pedido
+
+Después de que el servidor confirma el envío, Caja muestra `ReceiptSheet` con
+la opción de imprimir. `receiptService` genera el documento con los precios y
+datos guardados del pedido; `shared/printing/browserPrinter.web.js` abre una
+pestaña imprimible y el diálogo de Android. No escribe pedidos ni marca pagos.
+Los errores de impresión se manejan aparte de los errores al enviar a cocina.
+El formato térmico usa `shared/theme/printing.js` y `shared/styles/print/receipt.js`.
+La facturación electrónica de Hacienda queda para una etapa posterior.
+
+Equipo, configuración y límites: [impresión Android](IMPRESION_ANDROID.md).
 
 ## 9. Estilos
 
