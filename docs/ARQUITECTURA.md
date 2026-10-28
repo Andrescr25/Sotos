@@ -11,11 +11,13 @@ pedido y cuándo, cuentas con acceso asignado por el administrador, pantallas de
 caja, cocina, administración de usuarios y **gestión del menú** (platillos,
 bebidas, extras, categorías y observaciones frecuentes), **cobro del pedido
 antes de enviarlo a cocina** (efectivo con cálculo de vuelto, tarjeta y SINPE
-Móvil), **cierre de caja** (cuadre del efectivo e historial de cierres) e
-impresión opcional de comprobantes de pedidos enviados desde Chrome Android.
+Móvil), **cierre de caja** (cuadre del efectivo e historial de cierres),
+**inventario** (insumos en porciones, recetas por platillo y descuento automático
+con cada venta) e impresión opcional de comprobantes de pedidos enviados desde
+Chrome Android.
 
-**No incluye todavía:** facturación, inventario, reportes,
-contabilidad, mesas, pagos, división de cuentas, delivery.
+**No incluye todavía:** facturación, reportes, contabilidad, mesas, división de
+cuentas, pagos divididos, propinas y descuentos, delivery.
 
 ## 2. Stack
 
@@ -48,20 +50,22 @@ src/
 │   ├── orders/     piezas compartidas: lista en vivo, detalle de líneas, estado
 │   ├── menu/       useMenu: el menú en vivo (lo usan Caja y Administración)
 │   ├── workspace/  marco compartido y navegación según los permisos
-│   └── admin/      inicio, usuarios y accesos, y gestión del menú
+│   ├── inventory/  useInventory: el inventario en vivo (lo usa Administración)
+│   └── admin/      inicio, usuarios y accesos, gestión del menú e inventario
 │
 ├── services/       Casos de uso: combinan dominio + repositorios.
-│   └── orderService, authService, userService, menuService, cashClosingService
+│   └── orderService, authService, userService, menuService, cashClosingService, inventoryService
 │
 ├── domain/         Reglas de negocio. JavaScript puro: sin React, sin red, sin I/O.
 │   ├── orders/     pedido, líneas, estados, precios, integridad, errores
 │   ├── payments/   formas de pago, cobro, vuelto y montos sugeridos
 │   ├── cashClosing/ resumen de ventas y cierre de caja (cuadre del efectivo)
+│   ├── inventory/  insumos, stock en porciones, recetas y consumo de un pedido
 │   ├── menu/       categorías, productos, extras; operaciones del administrador y consultas
 │   └── users/      roles, permisos, acceso por zona, reglas de cuentas
 │
 ├── data/           Acceso a datos detrás de contratos.
-│   ├── contracts.js        Order/Auth/User/Menu/CashClosingRepository
+│   ├── contracts.js        Order/Auth/User/Menu/CashClosing/InventoryRepository
 │   ├── memory/             En memoria (desarrollo sin servidor y pruebas)
 │   ├── remote/             Servidor: cliente HTTP, tiempo real, repositorios
 │   ├── session/            Token de sesión (llavero del sistema / localStorage)
@@ -90,7 +94,7 @@ server/             Backend (paquete Node independiente, se despliega en Render;
     ├── security/           Hash de contraseñas (scrypt) y tokens
     ├── http/               Rutas de auth, usuarios y pedidos; permisos; límite de intentos
     ├── realtime/           Canal WebSocket (sesión, latido, difusión por rol)
-    └── store/              Almacenes de pedidos, usuarios, menú y cierres de caja: Postgres y memoria
+    └── store/              Almacenes de pedidos, usuarios, menú, cierres de caja e inventario: Postgres y memoria
 ```
 
 El servidor **reutiliza `src/domain`** (se empaqueta con esbuild, alias `@/`):
@@ -121,6 +125,8 @@ User ───< Order 1 ───< OrderItem 1 ───< OrderItemExtra
                └──── Payment                    (cobro; obligatorio para enviar a cocina)
 
 CashClosing ──── cubre los pedidos cobrados desde el cierre anterior (cada uno, en un solo cierre)
+
+InventoryItem >───< Product / Extra          (receta: cuántas porciones usa cada unidad vendida)
 ```
 
 | Entidad | Campos clave |
@@ -133,6 +139,8 @@ CashClosing ──── cubre los pedidos cobrados desde el cierre anterior (ca
 | **Invitation** | `tokenHash`, `userId`, `createdById`, `expiresAt`, `usedAt` (solo servidor) |
 | **Order** | `id`, `number`, `type`, `tableId`, `status`, `items[]`, **`customerName`**, **`payment`**, `note`, `createdBy`, `createdAt`, `updatedAt`, `statusHistory[]`, `totals` |
 | **Payment** | `method` (`cash`/`card`/`sinpe`), `amount` (el total del pedido), `tendered` (lo que entregó el cliente), `change` (vuelto), `paidAt`, `receivedBy` |
+| **InventoryItem** | `id`, `name`, `unit` (paquete, kg…), `portionsPerUnit`, `stock` (porciones, puede ser negativo), `minPortions` |
+| **Inventory** | `items[]` y `recipes` (`products` y `extras`: id del menú → líneas `{ itemId, portions }`) — un único documento |
 | **CashClosing** | `id`, `number` (consecutivo), `closedAt`, `closedBy`, `periodStart`, `sales` (totales por forma de pago y cancelados), `cash` (`openingFloat`, `cashSales`, `expected`, `counted`, `difference`), `note` |
 | **OrderItem** | `id`, `productId`, `name`*, `kind`*, `unitPrice`*, `quantity`, `extras[]`, `notes[]` |
 | **OrderItemExtra** | `extraId`, `name`*, `unitPrice`*, `quantity` |
@@ -170,6 +178,21 @@ menú después no altera pedidos ya tomados (clave para facturación e historial
 - **Efectivo, tarjeta y SINPE Móvil.** En efectivo se registra lo que entregó el
   cliente y se calcula el vuelto (`tendered - amount`); en tarjeta y SINPE se
   cobra el total exacto. El **vuelto no es venta**: las ventas suman `amount`.
+- **Inventario en porciones enteras.** Un insumo es lo que se compra ("paquete de
+  papas") y rinde `portionsPerUnit` porciones (8). El stock se guarda en
+  **porciones**, igual que el dinero va en colones enteros: 1/8 de paquete es
+  exactamente 1 porción, sin decimales ni errores de redondeo. La receta de un
+  platillo, bebida o **extra** dice cuántas porciones usa una unidad vendida
+  (los extras descuentan con su propia cantidad, como en el precio). Lo que no
+  tiene receta no descuenta nada.
+- **El descuento va con la venta.** Al guardar un pedido **nuevo**, el servidor
+  descuenta el inventario dentro de la **misma transacción**
+  (`saveOrder(order, check, onCreated)`): o quedan guardados el pedido y el
+  descuento, o ninguno. Los cambios de estado posteriores no vuelven a
+  descontar, y reenviar un pedido (reintento) tampoco.
+- **Nunca se bloquea una venta por falta de stock.** El stock puede quedar
+  negativo y se lee como "Faltan 1/4 de paquete": el registro siempre va detrás
+  de la realidad y el restaurante no puede dejar de vender.
 - **El menú es un documento.** Se guarda completo (JSONB) y cada cambio del
   administrador es una función pura de `domain/menu` aplicada de forma atómica:
   dos administradores editando a la vez se aplican uno tras otro.
@@ -236,6 +259,7 @@ Invitar empleado: nombre, usuario, rol
 | Marcar entregado | ✅ | — | ✅ |
 | Cancelar | ✅ | — | ✅ |
 | Cierre de caja (ver el cuadre, cerrar y consultar cierres) | ✅ | — | ✅ |
+| Administrar el inventario (insumos, stock y recetas) | — | — | ✅ |
 | Gestionar usuarios y accesos | — | — | ✅ |
 
 Fuentes de verdad: `domain/users/permissions.js` (roles → permisos),
@@ -323,12 +347,17 @@ Todas las rutas exigen `Authorization: Bearer <token>`, salvo las marcadas.
 | `GET /orders/:id` | Un pedido | ver pedidos |
 | `PUT /orders/:id` | Guarda o avanza un pedido | según la transición |
 | `POST /orders/next-number` | Siguiente número del día (atómico) | enviar pedido |
+| `GET /inventory` | Insumos, stock y recetas | administrar inventario |
+| `POST /inventory/items` · `PATCH` / `DELETE /inventory/items/:id` | Crear, editar y eliminar un insumo (eliminar lo quita de las recetas) | administrar inventario |
+| `POST /inventory/items/:id/adjust` | Ajustar stock: `{ mode: 'add' o 'set', portions }` (compra, merma o conteo) | administrar inventario |
+| `PUT /inventory/recipes/:kind/:id` | Receta de un producto o extra (`kind` = `products` o `extras`): `{ lines }`; sin líneas la quita | administrar inventario |
 | `GET /cash-closings/pending` | Lo cobrado desde el último cierre, por forma de pago, y el fondo sugerido | cerrar caja |
 | `POST /cash-closings` | Cierra la caja: `{ id, openingFloat, countedCash, note }`. El servidor calcula todo lo demás; repetir el mismo `id` no duplica | cerrar caja |
 | `GET /cash-closings?limit=` | Cierres anteriores, del más reciente al más antiguo | cerrar caja |
 | `WS /realtime` | Eventos en vivo; primer mensaje `{type:'auth', token}` | sesión |
 
-**Eventos en tiempo real:** `order:saved` (a quien puede ver pedidos),
+**Eventos en tiempo real:** `inventory:changed` (a quien administra el inventario:
+cambió el stock o las recetas, también por una venta), `order:saved` (a quien puede ver pedidos),
 `user:updated` (a la persona cuyo rol o estado cambió), `users:changed` (a los
 administradores cuando hay altas o cambios) y `menu:changed` (a Caja y
 Administración cuando el administrador edita el menú: recargan solos).
@@ -371,6 +400,7 @@ Administración cuando el administrador edita el menú: recargan solos).
 | **Login** | Usuario y contraseña. Sin selector de rol y sin "Crear cuenta": las cuentas las crea el administrador. |
 | **Acceso pendiente** | Cuenta sin rol; se actualiza sola cuando el admin asigna acceso. |
 | **Caja** | Categorías → productos → (extras y observaciones) → resumen → **cobro** → cocina. Botón "Listos (n)" para entregar y "Cierre de caja". Desde 960 px de espacio útil el resumen va a la derecha; en tamaños menores se apila debajo, con un acceso rápido «Ver pedido». |
+| **Inventario** (admin) | Pestañas *Insumos* y *Recetas*. En Insumos: lo que queda ("2 y 3/8 paquetes · 19 porciones"), aviso de agotado o por reponer, ajustar stock (entró mercadería, merma o conteo, viendo cómo quedará) y editar. En Recetas: cada platillo, bebida y extra con lo que gasta ("Papas: 1/8 de paquete") y un editor con un selector de porciones por insumo. Se actualiza solo con cada venta. |
 | **Cierre de caja** | Lo cobrado desde el último cierre por forma de pago (efectivo, tarjeta, SINPE Móvil) y el cuadre del efectivo: fondo inicial + cobrado en efectivo = esperado; se cuenta el cajón y se muestra si cuadra, sobra o falta. Pide confirmación antes de cerrar y guarda el cierre. Debajo, el historial. Cajero y administrador. |
 | **Cocina** | Tablero Nuevos / En preparación / Listos con tarjetas grandes: número, hora, tiempo transcurrido (verde/ámbar/rojo), líneas con extras y observaciones, botón del siguiente paso. |
 | **Administración** | Inicio con atajos y aviso de cuentas pendientes; "Usuarios y accesos" para invitar empleados, asignar rol, habilitar y restablecer contraseñas. |
@@ -378,6 +408,26 @@ Administración cuando el administrador edita el menú: recargan solos).
 | **Menú** (administrador) | Pestañas *Platillos y bebidas*, *Extras*, *Categorías* y *Observaciones*: crear, editar, ocultar, ordenar con flechas y eliminar con confirmación. Si el menú está vacío ofrece crear la primera categoría o cargar un menú de ejemplo. Caja ve los cambios al instante. |
 
 Los umbrales de color de la cocina están en `features/kitchen/config.js`.
+
+### Inventario
+
+El administrador crea los **insumos** ("Papas", unidad *paquete*, rinde **8**
+porciones, 3 paquetes = 24 porciones) y en la pestaña *Recetas* define cuánto usa
+cada producto o extra: "Papas fritas: 1 porción (1/8 de paquete)". Desde entonces,
+cada pedido que sale de Caja rebaja 1/8 de paquete por plato, sin que nadie haga
+nada. Cuando compra, hay merma o cuenta la bodega, **ajusta el stock** (suma, resta
+o fija). El stock bajo el mínimo o en cero aparece como "Por reponer" / "Agotado" y
+cuenta en el inicio de Administración.
+
+- Cambiar las porciones por unidad de un insumo **redefine** qué es una porción: el
+  stock y las recetas siguen contando porciones; la pantalla lo advierte y conviene
+  hacer un conteo después.
+- Una receta solo puede apuntar a un producto o extra que exista en el menú; quitar
+  una receta se permite siempre (limpia las de productos ya eliminados).
+- **Fuera de alcance por ahora:** devolver stock al cancelar un pedido (hoy no hay
+  botón de cancelar en Caja; al agregarlo hay que decidir si lo ya cocinado
+  se devuelve), historial de movimientos, costos y compras, y marcar productos
+  como agotados en Caja.
 
 ### Cobro del pedido
 

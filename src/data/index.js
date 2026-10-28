@@ -26,4 +26,5 @@ export const {
   userRepository,
   menuRepository,
   cashClosingRepository,
+  inventoryRepository,
 } = repositories;

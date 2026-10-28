@@ -11,6 +11,7 @@ import { BrandLogo } from '@/shared/ui/BrandLogo';
 const NAVIGATION = [
   { key: 'admin', label: 'Resumen', icon: 'grid-outline', route: '/admin', area: AREAS.ADMIN },
   { key: 'menu', label: 'Menú', icon: 'restaurant-outline', route: '/admin/menu', area: AREAS.ADMIN },
+  { key: 'inventory', label: 'Inventario', icon: 'cube-outline', route: '/admin/inventario', area: AREAS.ADMIN },
   { key: 'users', label: 'Equipo', icon: 'people-outline', route: '/admin/usuarios', area: AREAS.ADMIN },
   { key: 'cashier', label: 'Caja', icon: 'receipt-outline', route: '/caja', area: AREAS.CASHIER },
   { key: 'closing', label: 'Cierre', icon: 'wallet-outline', route: '/caja/cierre', area: AREAS.CASHIER },

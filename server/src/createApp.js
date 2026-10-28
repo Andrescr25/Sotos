@@ -6,6 +6,7 @@ import { createCashRoutes } from './http/cashRoutes';
 import { resolveCorsOrigin } from './http/cors';
 import { createRateLimiter } from './http/createRateLimiter';
 import { HttpError, getBearerToken, sendJson, statusForCode } from './http/httpUtils';
+import { createInventoryRoutes } from './http/inventoryRoutes';
 import { createMenuRoutes } from './http/menuRoutes';
 import { createOrderRoutes } from './http/orderRoutes';
 import { createUserRoutes } from './http/userRoutes';
@@ -23,11 +24,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @param {import('./store/contracts').UserStore} deps.userStore
  * @param {import('./store/contracts').MenuStore} deps.menuStore
  * @param {import('./store/contracts').CashStore} deps.cashStore
+ * @param {import('./store/contracts').InventoryStore} deps.inventoryStore
  * @param {{ timeZone: string, sessionTtlDays?: number, inviteTtlDays?: number, corsOrigins?: string[], loginRateLimit?: { max: number, windowMs: number } }} deps.config
  * @param {() => Date} [deps.now]
  * @param {number} [deps.heartbeatMs]
  */
-export function createApp({ orderStore, userStore, menuStore, cashStore, config, now = () => new Date(), heartbeatMs }) {
+export function createApp({ orderStore, userStore, menuStore, cashStore, inventoryStore, config, now = () => new Date(), heartbeatMs }) {
   const authService = createAuthService({
     userStore,
     sessionTtlMs: (config.sessionTtlDays ?? 30) * DAY_MS,
@@ -44,7 +46,8 @@ export function createApp({ orderStore, userStore, menuStore, cashStore, config,
     ...createAuthRoutes({ authService, rateLimiter, hub }),
     ...createUserRoutes({ authService, hub }),
     ...createMenuRoutes({ menuStore, hub }),
-    ...createOrderRoutes({ orderStore, hub, timeZone: config.timeZone, now }),
+    ...createInventoryRoutes({ inventoryStore, menuStore, hub }),
+    ...createOrderRoutes({ orderStore, inventoryStore, hub, timeZone: config.timeZone, now }),
     ...createCashRoutes({ cashStore, now }),
   ];
 

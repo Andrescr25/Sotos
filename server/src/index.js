@@ -6,11 +6,13 @@ import { explainConnectionError, isDatabaseError } from './diagnostics/databaseC
 import { createApp } from './createApp';
 import { hashPassword } from './security/passwords';
 import { createMemoryCashStore } from './store/createMemoryCashStore';
+import { createMemoryInventoryStore } from './store/createMemoryInventoryStore';
 import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
 import { createPgDb } from './store/createPgDb';
 import { createPostgresCashStore } from './store/createPostgresCashStore';
+import { createPostgresInventoryStore } from './store/createPostgresInventoryStore';
 import { createPostgresMenuStore } from './store/createPostgresMenuStore';
 import { createPostgresStore } from './store/createPostgresStore';
 import { createPostgresUserStore } from './store/createPostgresUserStore';
@@ -30,6 +32,7 @@ async function main() {
   let userStore;
   let menuStore;
   let cashStore;
+  let inventoryStore;
   const inMemory = !config.databaseUrl;
 
   if (inMemory) {
@@ -39,6 +42,7 @@ async function main() {
     // En desarrollo local el menú arranca con datos de ejemplo.
     menuStore = createMemoryMenuStore(menuSeed);
     cashStore = createMemoryCashStore({ orderStore });
+    inventoryStore = createMemoryInventoryStore();
   } else {
     const problem = describeConnectionProblem(config.databaseUrl);
     if (problem) console.warn(problem);
@@ -50,14 +54,16 @@ async function main() {
     // En producción el menú empieza vacío: lo arma el administrador.
     menuStore = createPostgresMenuStore(db);
     cashStore = createPostgresCashStore(db);
+    inventoryStore = createPostgresInventoryStore(db);
   }
 
   await orderStore.init();
   await userStore.init();
   await menuStore.init();
   await cashStore.init(); // después de los pedidos: lee su tabla
+  await inventoryStore.init();
 
-  const app = createApp({ orderStore, userStore, menuStore, cashStore, config });
+  const app = createApp({ orderStore, userStore, menuStore, cashStore, inventoryStore, config });
 
   if (inMemory) {
     await seedDevelopmentUsers(userStore);
@@ -85,6 +91,7 @@ async function main() {
     await userStore.close();
     await menuStore.close();
     await cashStore.close();
+    await inventoryStore.close();
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));

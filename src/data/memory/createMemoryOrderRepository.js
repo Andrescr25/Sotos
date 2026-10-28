@@ -13,9 +13,12 @@ import { getBusinessDay } from '@/shared/utils/time';
  * @param {Object} [options]
  * @param {() => Date} [options.now]
  * @param {() => import('@/domain/users/roles').User | null} [options.getActor]
+ * @param {(order: import('@/domain/orders/order').Order) => void} [options.onOrderCreated]
+ *   se llama una vez por cada pedido nuevo (no en cambios de estado); así el
+ *   modo en memoria descuenta el inventario, como lo hace el servidor
  * @returns {import('@/data/contracts').OrderRepository}
  */
-export function createMemoryOrderRepository({ now = () => new Date(), getActor } = {}) {
+export function createMemoryOrderRepository({ now = () => new Date(), getActor, onOrderCreated } = {}) {
   /** @type {Map<string, import('@/domain/orders/order').Order>} */
   const orders = new Map();
   const events = createEventEmitter();
@@ -29,6 +32,7 @@ export function createMemoryOrderRepository({ now = () => new Date(), getActor }
       if (!verdict.ok) throw new OrderError(verdict.code, verdict.message);
 
       orders.set(order.id, order);
+      if (!existing) onOrderCreated?.(order);
       events.emit({ type: 'order:saved', order });
       return order;
     },

@@ -119,6 +119,20 @@ export const CASH_SCHEMA = [
 ];
 
 /**
+ * El inventario (insumos, stock y recetas) vive en un solo documento JSONB,
+ * igual que el menú: es pequeño, y así cada cambio del administrador y cada
+ * descuento por una venta es atómico y se valida con funciones puras del dominio.
+ */
+export const INVENTORY_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS inventory_documents (
+     id         text PRIMARY KEY,
+     data       jsonb NOT NULL,
+     updated_at timestamptz NOT NULL DEFAULT now()
+   )`,
+  ...lockDown('inventory_documents'),
+];
+
+/**
  * El menú completo vive en un solo documento JSONB. Es pequeño (decenas o
  * cientos de productos), y así cada cambio del administrador es atómico y se
  * valida con las mismas funciones puras del dominio.

@@ -30,14 +30,15 @@ const VARIANTS = {
  * @param {string} [props.icon]  nombre de icono a la izquierda
  * @param {boolean} [props.disabled]
  * @param {boolean} [props.compact]  versión más baja para barras y filas
+ * @param {string} [props.accessibilityLabel]  nombre para lectores de pantalla si debe distinguirse del texto (p. ej. en listas)
  */
-export function Button({ label, onPress, variant = 'primary', icon, disabled = false, compact = false, style }) {
+export function Button({ label, onPress, variant = 'primary', icon, disabled = false, compact = false, accessibilityLabel, style }) {
   const palette = VARIANTS[variant];
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}

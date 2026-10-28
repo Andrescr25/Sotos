@@ -24,10 +24,12 @@ export function createMemoryStore() {
     },
 
     // Node es de un solo hilo y no hay `await` entre leer y escribir: es atómico.
-    async saveOrder(order, check) {
-      const verdict = check(orders.get(order.id) ?? null);
+    async saveOrder(order, check, onCreated) {
+      const existing = orders.get(order.id) ?? null;
+      const verdict = check(existing);
       if (!verdict.ok) return verdict;
       orders.set(order.id, order);
+      if (!existing) await onCreated?.(null);
       return { ok: true, order };
     },
 

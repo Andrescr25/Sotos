@@ -84,6 +84,20 @@
  * @property {(options?: { limit?: number }) => Promise<import('@/domain/cashClosing').CashClosing[]>} list
  *   Del más reciente al más antiguo.
  *
+ * ── Inventario ───────────────────────────────────────────────────────────
+ *
+ * @typedef {Object} InventoryRepository
+ * @property {() => Promise<import('@/domain/inventory').Inventory>} getInventory
+ *   Solo administrador.
+ * @property {(input: { name: string, unit: string, portionsPerUnit: number, stock?: number, minPortions?: number }) => Promise<{ inventory: import('@/domain/inventory').Inventory, id: string }>} createItem
+ * @property {(id: string, patch: object) => Promise<import('@/domain/inventory').Inventory>} updateItem
+ * @property {(id: string) => Promise<import('@/domain/inventory').Inventory>} deleteItem
+ * @property {(id: string, adjustment: { mode: 'add' | 'set', portions: number }) => Promise<import('@/domain/inventory').Inventory>} adjustStock
+ * @property {(kind: 'products' | 'extras', targetId: string, lines: { itemId: string, portions: number }[]) => Promise<import('@/domain/inventory').Inventory>} setRecipe
+ *   Lanza error con `code` `inventory_invalid_recipe`, `inventory_item_not_found`...
+ * @property {(listener: (event: { type: 'inventory:changed' } | ConnectionEvent) => void) => () => void} subscribe
+ *   Avisa cuando cambia el stock o las recetas (por el administrador o por una venta).
+ *
  * ── Menú ─────────────────────────────────────────────────────────────────
  *
  * @typedef {'categories' | 'products' | 'extras'} MenuCollection

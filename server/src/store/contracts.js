@@ -8,10 +8,25 @@
  * @property {() => Promise<void>} init  crea el esquema si no existe
  * @property {(id: string) => Promise<import('@/domain/orders/order').Order | null>} getOrder
  * @property {(filter?: { statuses?: string[], createdById?: string }) => Promise<import('@/domain/orders/order').Order[]>} listOrders
- * @property {(order: import('@/domain/orders/order').Order, check: (existing: import('@/domain/orders/order').Order | null) => import('@/domain/orders/orderIntegrity').WriteVerdict) => Promise<SaveResult>} saveOrder
+ * @property {(order: import('@/domain/orders/order').Order, check: (existing: import('@/domain/orders/order').Order | null) => import('@/domain/orders/orderIntegrity').WriteVerdict, onCreated?: (tx: { query: Function } | null) => Promise<void>) => Promise<SaveResult>} saveOrder
  *   Evalúa `check` contra el pedido guardado DENTRO de la misma operación
- *   atómica que la escritura (bloqueo de fila en Postgres).
+ *   atómica que la escritura (bloqueo de fila en Postgres). `onCreated` se
+ *   ejecuta dentro de esa misma operación solo cuando el pedido se INSERTA por
+ *   primera vez (no en cambios de estado); si lanza, el pedido tampoco se guarda.
+ *   Recibe la transacción de Postgres, o null en memoria.
  * @property {(day: string) => Promise<number>} nextOrderNumber  atómico; `day` = "YYYY-MM-DD"
+ * @property {() => Promise<void>} close
+ *
+ * @typedef {Object} InventoryStore
+ * @property {() => Promise<void>} init
+ * @property {() => Promise<import('@/domain/inventory').Inventory>} getInventory  vacío si aún no hay inventario
+ * @property {(apply: (inventory: import('@/domain/inventory').Inventory) => import('@/domain/inventory').Inventory) => Promise<import('@/domain/inventory').Inventory>} updateInventory
+ *   Aplica un cambio de forma atómica (bloqueo de fila en Postgres). Si `apply`
+ *   lanza InventoryError no se guarda nada.
+ * @property {(order: import('@/domain/orders/order').Order, tx?: { query: Function } | null) => Promise<boolean>} consumeForOrder
+ *   Descuenta del stock lo que gasta un pedido nuevo según las recetas. Con `tx`
+ *   corre dentro de esa transacción (la del pedido). Devuelve si cambió el stock.
+ *   Nunca bloquea una venta: el stock puede quedar negativo.
  * @property {() => Promise<void>} close
  *
  * @typedef {Object} CashStore

@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { CASH_SCHEMA, MENU_SCHEMA, ORDER_SCHEMA, USER_SCHEMA } from './schema';
+import { CASH_SCHEMA, INVENTORY_SCHEMA, MENU_SCHEMA, ORDER_SCHEMA, USER_SCHEMA } from './schema';
 
 const TABLES = [
   'orders',
@@ -10,10 +10,11 @@ const TABLES = [
   'menu_documents',
   'cash_closings',
   'cash_closing_orders',
+  'inventory_documents',
 ];
 
 async function applySchema(db) {
-  for (const statement of [...USER_SCHEMA, ...ORDER_SCHEMA, ...MENU_SCHEMA, ...CASH_SCHEMA]) {
+  for (const statement of [...USER_SCHEMA, ...ORDER_SCHEMA, ...MENU_SCHEMA, ...CASH_SCHEMA, ...INVENTORY_SCHEMA]) {
     await db.query(statement);
   }
 }

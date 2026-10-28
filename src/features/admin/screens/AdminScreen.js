@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
+import { STOCK_STATUS, getStockStatus } from '@/domain/inventory';
 import { useAuth } from '@/features/auth';
+import { useInventory } from '@/features/inventory/useInventory';
 import { useMenu } from '@/features/menu/useMenu';
 import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
 import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
@@ -15,6 +17,8 @@ export default function AdminScreen() {
   const { mobile } = useResponsiveLayout();
   const { users, pendingCount, loading: usersLoading, error: usersError } = useUsers();
   const { menu, loading: menuLoading } = useMenu();
+  const { inventory, loading: inventoryLoading, error: inventoryError } = useInventory();
+  const toRestock = (inventory?.items ?? []).filter((item) => getStockStatus(item) !== STOCK_STATUS.OK).length;
   const name = user?.name?.split(' ')[0] || 'equipo';
 
   return (
@@ -31,12 +35,14 @@ export default function AdminScreen() {
       <View style={styles.metrics}>
         <MetricCard label="Productos disponibles" value={menuLoading || !menu ? '—' : menu.products.filter((product) => product.active).length} icon="restaurant-outline" hint="En el menú" />
         <MetricCard label="Personas del equipo" value={usersLoading || usersError ? '—' : users.length} icon="people-outline" hint="Cuentas del restaurante" />
+        <MetricCard label="Insumos por reponer" value={inventoryLoading || inventoryError || !inventory ? '—' : toRestock} icon="cube-outline" hint="Agotados o bajo el mínimo" color={toRestock ? 'warning' : 'success'} />
         <MetricCard label="Accesos pendientes" value={usersLoading || usersError ? '—' : pendingCount} icon="person-add-outline" hint="Por asignar" color={pendingCount ? 'warning' : 'success'} />
       </View>
       <View style={styles.section}>
         <Text variant="title" style={styles.sectionTitle}>Todo en su lugar</Text>
         <View style={styles.actions}>
           <ActionCard title="Menú: platillos, bebidas y extras" description="Organiza lo que servimos, sus precios y las opciones de cada producto." icon="restaurant-outline" onPress={() => router.push('/admin/menu')} />
+          <ActionCard title="Inventario" description="Controla el stock de tus insumos y cuánto gasta cada platillo: cada venta descuenta sola." icon="cube-outline" onPress={() => router.push('/admin/inventario')} />
           <ActionCard title={pendingCount ? `Usuarios y accesos (${pendingCount} pendientes)` : 'Usuarios y accesos'} description="Invita a tu equipo y administra sus accesos desde un solo lugar." icon="people-outline" onPress={() => router.push('/admin/usuarios')} />
         </View>
       </View>

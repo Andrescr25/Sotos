@@ -53,6 +53,16 @@ const MESSAGES = {
   payment_invalid_amount: 'Escribe con cuánto paga el cliente (solo números, sin decimales).',
   payment_invalid_method: 'Elige cómo paga el cliente: efectivo, tarjeta o SINPE Móvil.',
 
+  // Inventario
+  inventory_invalid_name: 'El nombre del insumo debe tener entre 1 y 60 caracteres.',
+  inventory_invalid_unit: 'Escribe la unidad con la que se compra o se cuenta (paquete, kg, botella…).',
+  inventory_invalid_portions: 'Las porciones por unidad deben ser un número entero de 1 en adelante.',
+  inventory_invalid_amount: 'La cantidad debe ser un número entero de porciones.',
+  inventory_invalid_adjustment: 'El ajuste no es válido.',
+  inventory_invalid_recipe: 'La receta no es válida: cada insumo una sola vez y con porciones enteras de 1 en adelante.',
+  inventory_duplicate_name: 'Ya existe un insumo con ese nombre.',
+  inventory_item_not_found: 'El insumo ya no existe.',
+
   // Cierre de caja
   cash_no_sales: 'No hay pedidos cobrados por cerrar desde el último cierre.',
   cash_invalid_amount: 'El fondo inicial y el efectivo contado deben ser montos enteros en colones.',

@@ -37,7 +37,7 @@ export function createPostgresStore(db) {
       return rows.map((row) => row.data);
     },
 
-    async saveOrder(order, check) {
+    async saveOrder(order, check, onCreated) {
       return db.transaction(async (tx) => {
         // Bloquea la fila: otra tablet que intente cambiar el mismo pedido
         // espera aquí y luego será evaluada contra el estado ya actualizado.
@@ -69,6 +69,8 @@ export function createPostgresStore(db) {
               message: 'El pedido ya fue creado desde otro dispositivo',
             };
           }
+          // Mismo `COMMIT` que el pedido: si esto falla, el pedido tampoco se guarda.
+          await onCreated?.(tx);
         }
         return { ok: true, order };
       });

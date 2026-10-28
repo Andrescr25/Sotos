@@ -3,6 +3,7 @@ import { createHttpClient } from '@/data/remote/createHttpClient';
 import { createRealtimeClient } from '@/data/remote/createRealtimeClient';
 import { createRemoteAccountRepositories } from '@/data/remote/createRemoteAccountRepositories';
 import { createRemoteCashClosingRepository } from '@/data/remote/createRemoteCashClosingRepository';
+import { createRemoteInventoryRepository } from '@/data/remote/createRemoteInventoryRepository';
 import { createRemoteMenuRepository } from '@/data/remote/createRemoteMenuRepository';
 import { createRemoteOrderRepository } from '@/data/remote/createRemoteOrderRepository';
 import { createMemoryTokenStorage } from '@/data/session/createMemoryTokenStorage';
@@ -20,13 +21,16 @@ import {
   setCustomerName,
 } from '@/domain/orders';
 import { CASH_CLOSING_ERROR } from '@/domain/cashClosing';
+import { INVENTORY_ERROR, RECIPE_KIND } from '@/domain/inventory';
 import { MENU_ERROR } from '@/domain/menu';
 import { PAYMENT_ERROR, PAYMENT_METHOD } from '@/domain/payments';
 import { ROLES, USER_ERROR } from '@/domain/users';
 import { createCashClosingService } from '@/services/cashClosingService';
+import { createInventoryService } from '@/services/inventoryService';
 import { createOrderService } from '@/services/orderService';
 import { createApp } from './createApp';
 import { createMemoryCashStore } from './store/createMemoryCashStore';
+import { createMemoryInventoryStore } from './store/createMemoryInventoryStore';
 import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
@@ -55,6 +59,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
   let userStore;
   let menuStore;
   let cashStore;
+  let inventoryStore;
   let app;
   let port;
   let baseUrl;
@@ -66,6 +71,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       userStore,
       menuStore,
       cashStore,
+      inventoryStore,
       config: { timeZone: 'America/Costa_Rica', loginRateLimit },
       heartbeatMs: 200,
     });
@@ -88,6 +94,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     const orderRepository = createRemoteOrderRepository({ http, realtime });
     const menuRepository = createRemoteMenuRepository({ http, realtime });
     const cashClosingRepository = createRemoteCashClosingRepository({ http });
+    const inventoryRepository = createRemoteInventoryRepository({ http, realtime });
     return {
       session,
       http,
@@ -95,6 +102,8 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       orderRepository,
       menuRepository,
       cashClosingRepository,
+      inventoryRepository,
+      inventoryService: createInventoryService({ inventoryRepository }),
       orderService: createOrderService({ orderRepository }),
       cashClosingService: createCashClosingService({ cashClosingRepository }),
     };
@@ -143,6 +152,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     userStore = createMemoryUserStore();
     menuStore = createMemoryMenuStore();
     cashStore = createMemoryCashStore({ orderStore });
+    inventoryStore = createMemoryInventoryStore();
     await startApp();
     await app.authService.ensureAdmin({ username: 'admin', password: 'admin123', name: 'Administrador' });
   });
@@ -1007,6 +1017,212 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
 
       expect(response.status).toBe(409);
       expect((await response.json()).error.code).toBe(CASH_CLOSING_ERROR.NO_SALES);
+    });
+  });
+
+  describe('inventario', () => {
+    /**
+     * El administrador arma un menú mínimo y un inventario: "Papas" (₡1.500) y
+     * "Hamburguesa" (₡3.500) con "Queso extra" (₡500); un paquete de papas rinde
+     * 8 porciones y un kg de queso, 10.
+     */
+    async function restaurant() {
+      const admin = await adminTablet();
+      const menu = admin.device.menuRepository;
+      const category = await menu.create('categories', { name: 'Platillos' });
+      const queso = await menu.create('extras', { name: 'Queso extra', price: 500 });
+      await menu.create('products', { categoryId: category.id, name: 'Papas', kind: 'dish', price: 1500 });
+      await menu.create('products', {
+        categoryId: category.id, name: 'Hamburguesa', kind: 'dish', price: 3500, extraIds: [queso.id],
+      });
+      const current = await menu.getMenu();
+      const products = Object.fromEntries(current.products.map((product) => [product.name, product]));
+      const cheeseExtra = current.extras.find((extra) => extra.id === queso.id);
+
+      const inventory = admin.device.inventoryService;
+      const { id: papas } = await inventory.createItem({ name: 'Paquete de papas', unit: 'paquete', portionsPerUnit: 8, stock: 24 });
+      const { id: cheese } = await inventory.createItem({ name: 'Queso', unit: 'kg', portionsPerUnit: 10, stock: 30 });
+      await inventory.setRecipe(RECIPE_KIND.PRODUCTS, products.Papas.id, [{ itemId: papas, portions: 1 }]);
+      await inventory.setRecipe(RECIPE_KIND.PRODUCTS, products.Hamburguesa.id, [
+        { itemId: papas, portions: 1 },
+        { itemId: cheese, portions: 2 },
+      ]);
+      await inventory.setRecipe(RECIPE_KIND.EXTRAS, cheeseExtra.id, [{ itemId: cheese, portions: 3 }]);
+      return { admin, inventory, products, cheeseExtra, ids: { papas, cheese } };
+    }
+
+    const draftOf = (user, items, name = 'Luis Rojas') =>
+      items.reduce((order, item) => addItem(order, createOrderItem(item)), setCustomerName(createDraftOrder({ createdBy: user }), name));
+
+    const stock = async (inventory, id) => (await inventory.getInventory()).items.find((item) => item.id === id).stock;
+
+    it('cada venta rebaja del paquete la porción que usa el platillo (1 de 8)', async () => {
+      const { inventory, products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 1 }]), caja.user, PAYMENT);
+      expect(await stock(inventory, ids.papas)).toBe(23);
+
+      await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 3 }]), caja.user, PAYMENT);
+      expect(await stock(inventory, ids.papas)).toBe(20);
+    });
+
+    it('descuenta platillos y extras: el extra usa su propia cantidad', async () => {
+      const { inventory, products, cheeseExtra, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      // 2 hamburguesas, solo 1 con queso extra.
+      await caja.device.orderService.sendToKitchen(
+        draftOf(caja.user, [{ product: products.Hamburguesa, quantity: 2, extras: [{ extra: cheeseExtra, quantity: 1 }] }]),
+        caja.user,
+        PAYMENT,
+      );
+
+      expect(await stock(inventory, ids.papas)).toBe(24 - 2);
+      expect(await stock(inventory, ids.cheese)).toBe(30 - (2 * 2 + 3));
+    });
+
+    it('un pedido sin recetas no toca el inventario, y vender sin stock no se bloquea', async () => {
+      const { admin, inventory, products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      await inventory.setRecipe(RECIPE_KIND.PRODUCTS, products.Papas.id, []); // Papas sin receta
+      await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 4 }]), caja.user, PAYMENT);
+      expect(await stock(inventory, ids.papas)).toBe(24);
+
+      await inventory.setRecipe(RECIPE_KIND.PRODUCTS, products.Papas.id, [{ itemId: ids.papas, portions: 1 }]);
+      await inventory.adjustStock(ids.papas, { mode: 'set', portions: 1 });
+      const sent = await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 3 }]), caja.user, PAYMENT);
+
+      expect(sent.status).toBe(ORDER_STATUS.NEW); // la venta salió
+      expect(await stock(admin.device.inventoryService, ids.papas)).toBe(-2);
+    });
+
+    it('reenviar el mismo pedido o avanzarlo en cocina no vuelve a descontar', async () => {
+      const { inventory, products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+      const draft = draftOf(caja.user, [{ product: products.Papas, quantity: 2 }]);
+
+      const sent = await caja.device.orderService.sendToKitchen(draft, caja.user, PAYMENT);
+      await caja.device.orderService.sendToKitchen(draft, caja.user, PAYMENT); // reintento tras perder la respuesta
+      await cocina.device.orderService.startPreparation(sent.id, cocina.user);
+      await cocina.device.orderService.markReady(sent.id, cocina.user);
+      await caja.device.orderService.markDelivered(sent.id, caja.user);
+
+      expect(await stock(inventory, ids.papas)).toBe(22);
+    });
+
+    it('un pedido rechazado (por ejemplo, sin pago) no descuenta nada', async () => {
+      const { inventory, products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const paid = sendOrderToKitchen(
+        draftOf(caja.user, [{ product: products.Papas, quantity: 2 }]),
+        { number: 1, user: caja.user, payment: PAYMENT },
+      );
+
+      await expect(caja.device.orderRepository.save({ ...paid, payment: null })).rejects.toMatchObject({
+        code: ORDER_ERROR.PAYMENT_REQUIRED,
+      });
+
+      expect(await stock(inventory, ids.papas)).toBe(24);
+    });
+
+    it('varias cajas vendiendo a la vez: todas las ventas quedan descontadas', async () => {
+      const { inventory, products, ids } = await restaurant();
+      const cajaA = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cajaB = await staffWithRole(ROLES.CASHIER, 'caja2');
+      const sell = (caja) =>
+        caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 1 }]), caja.user, PAYMENT);
+
+      await Promise.all([sell(cajaA), sell(cajaB), sell(cajaA), sell(cajaB), sell(cajaA)]);
+
+      expect(await stock(inventory, ids.papas)).toBe(24 - 5);
+    });
+
+    it('el administrador ve el stock cambiar en vivo, por una venta y por un ajuste', async () => {
+      const { admin, inventory, products, ids } = await restaurant();
+      const events = collect(admin.device.inventoryRepository.subscribe);
+      await waitFor(() => isConnected(events), 'administrador conectado');
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const changes = () => events.filter((event) => event.type === 'inventory:changed').length;
+
+      await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Papas, quantity: 1 }]), caja.user, PAYMENT);
+      await waitFor(() => changes() === 1, 'aviso por la venta');
+
+      await inventory.adjustStock(ids.papas, { mode: 'add', portions: 8 });
+      await waitFor(() => changes() === 2, 'aviso por el ajuste');
+    });
+
+    it('solo el administrador ve y edita el inventario; cajero y cocina no, aunque sus ventas sí descuentan', async () => {
+      const { products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+      const sinRol = await registerStaff('sinrol');
+
+      for (const { device } of [caja, cocina, sinRol]) {
+        const service = device.inventoryService;
+        await expect(service.getInventory()).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.createItem({ name: 'Sal', unit: 'kg', portionsPerUnit: 1 })).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.updateItem(ids.papas, { name: 'Otro' })).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.deleteItem(ids.papas)).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.adjustStock(ids.papas, { mode: 'set', portions: 999 })).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.setRecipe(RECIPE_KIND.PRODUCTS, products.Papas.id, [])).rejects.toMatchObject({ code: 'forbidden' });
+      }
+      const stored = await inventoryStore.getInventory();
+      expect(stored.items.find((item) => item.id === ids.papas)).toMatchObject({ name: 'Paquete de papas', stock: 24 });
+    });
+
+    it('el servidor aplica las reglas del dominio con códigos de error claros', async () => {
+      const { inventory, products, ids } = await restaurant();
+
+      await expect(inventory.createItem({ name: 'paquete de PAPAS', unit: 'paquete', portionsPerUnit: 8 })).rejects.toMatchObject({
+        code: INVENTORY_ERROR.DUPLICATE_NAME,
+      });
+      await expect(inventory.createItem({ name: 'Sal', unit: 'kg', portionsPerUnit: 0 })).rejects.toMatchObject({
+        code: INVENTORY_ERROR.INVALID_PORTIONS,
+      });
+      await expect(inventory.adjustStock(ids.papas, { mode: 'set', portions: -4 })).rejects.toMatchObject({
+        code: INVENTORY_ERROR.INVALID_AMOUNT,
+      });
+      await expect(inventory.updateItem('no-existe', { name: 'X' })).rejects.toMatchObject({
+        code: INVENTORY_ERROR.ITEM_NOT_FOUND,
+      });
+      await expect(
+        inventory.setRecipe(RECIPE_KIND.PRODUCTS, products.Papas.id, [{ itemId: ids.papas, portions: 0 }]),
+      ).rejects.toMatchObject({ code: INVENTORY_ERROR.INVALID_RECIPE });
+    });
+
+    it('una receta solo puede apuntar a un producto o extra que exista en el menú', async () => {
+      const { admin, inventory, ids } = await restaurant();
+
+      await expect(
+        inventory.setRecipe(RECIPE_KIND.PRODUCTS, 'prod-fantasma', [{ itemId: ids.papas, portions: 1 }]),
+      ).rejects.toMatchObject({ code: 'product_not_found' });
+      await expect(
+        inventory.setRecipe(RECIPE_KIND.EXTRAS, 'extra-fantasma', [{ itemId: ids.papas, portions: 1 }]),
+      ).rejects.toMatchObject({ code: 'extra_not_found' });
+
+      // Una receta de un producto que ya se borró del menú sí se puede quitar.
+      const { id } = await admin.device.menuRepository.create('products', {
+        categoryId: (await admin.device.menuRepository.getMenu()).categories[0].id,
+        name: 'Temporal', kind: 'dish', price: 100,
+      });
+      await inventory.setRecipe(RECIPE_KIND.PRODUCTS, id, [{ itemId: ids.papas, portions: 1 }]);
+      await admin.device.menuRepository.remove('products', id);
+      const cleaned = await inventory.setRecipe(RECIPE_KIND.PRODUCTS, id, []);
+      expect(cleaned.recipes.products[id]).toBeUndefined();
+    });
+
+    it('eliminar un insumo lo quita de las recetas y las ventas siguientes ya no lo usan', async () => {
+      const { inventory, products, ids } = await restaurant();
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      const after = await inventory.deleteItem(ids.cheese);
+      expect(after.recipes.products[products.Hamburguesa.id]).toEqual([{ itemId: ids.papas, portions: 1 }]);
+
+      await caja.device.orderService.sendToKitchen(draftOf(caja.user, [{ product: products.Hamburguesa, quantity: 1 }]), caja.user, PAYMENT);
+      expect(await stock(inventory, ids.papas)).toBe(23);
     });
   });
 });

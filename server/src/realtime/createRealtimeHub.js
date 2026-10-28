@@ -13,6 +13,7 @@ import { PERMISSIONS, can } from '@/domain/users';
  *   servidor -> { type: 'user:updated', user } a la persona afectada (rol o estado cambió)
  *   servidor -> { type: 'users:changed' }      a los administradores (alta o cambio de cuentas)
  *   servidor -> { type: 'menu:changed' }       a quien puede ver el menú (el administrador lo editó)
+ *   servidor -> { type: 'inventory:changed' }  a quien administra el inventario (cambió el stock o las recetas)
  *
  * Una cuenta sin rol puede conectarse (para enterarse al instante cuando el
  * administrador le da acceso) pero no recibe pedidos.
@@ -142,6 +143,11 @@ export function createRealtimeHub({ authenticate, heartbeatMs = 25_000, authTime
     /** El administrador cambió el menú: caja y administración lo recargan. */
     broadcastMenuChanged() {
       sendWhere((user) => can(user.role, PERMISSIONS.MENU_VIEW), { type: 'menu:changed' });
+    },
+
+    /** El inventario cambió (edición o venta): quien lo administra lo recarga. */
+    broadcastInventoryChanged() {
+      sendWhere((user) => can(user.role, PERMISSIONS.INVENTORY_MANAGE), { type: 'inventory:changed' });
     },
 
     /** Hubo un alta o un cambio de cuentas: los administradores recargan su lista. */

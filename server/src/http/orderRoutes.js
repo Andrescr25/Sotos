@@ -10,11 +10,12 @@ import { requirePermission } from './permissions';
  *
  * @param {Object} deps
  * @param {import('../store/contracts').OrderStore} deps.orderStore
+ * @param {import('../store/contracts').InventoryStore} deps.inventoryStore
  * @param {ReturnType<import('../realtime/createRealtimeHub').createRealtimeHub>} deps.hub
  * @param {string} deps.timeZone
  * @param {() => Date} deps.now
  */
-export function createOrderRoutes({ orderStore, hub, timeZone, now }) {
+export function createOrderRoutes({ orderStore, inventoryStore, hub, timeZone, now }) {
   return [
     {
       method: 'GET',
@@ -64,15 +65,26 @@ export function createOrderRoutes({ orderStore, hub, timeZone, now }) {
         // Las reglas se evalúan contra lo guardado, dentro de la misma
         // operación atómica que la escritura. Primero la forma y el flujo
         // del pedido; después quién lo hace y con qué rol.
-        const result = await orderStore.saveOrder(order, (existing) => {
-          const integrity = checkOrderWrite(existing, order);
-          return integrity.ok ? checkOrderActor(existing, order, user) : integrity;
-        });
+        //
+        // Un pedido nuevo (la venta) descuenta del inventario dentro de esa
+        // misma operación: o quedan guardados el pedido y el descuento, o ninguno.
+        // Los cambios de estado posteriores no vuelven a descontar.
+        let isNewOrder = false;
+        const result = await orderStore.saveOrder(
+          order,
+          (existing) => {
+            isNewOrder = existing === null;
+            const integrity = checkOrderWrite(existing, order);
+            return integrity.ok ? checkOrderActor(existing, order, user) : integrity;
+          },
+          (tx) => inventoryStore.consumeForOrder(order, tx),
+        );
         if (!result.ok) {
           throw new HttpError(statusForCode(result.code), result.code, result.message);
         }
 
         hub.broadcastOrder(result.order);
+        if (isNewOrder) hub.broadcastInventoryChanged();
         return { status: 200, body: { order: result.order } };
       },
     },

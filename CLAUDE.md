@@ -64,6 +64,16 @@ Arquitectura completa en `docs/ARQUITECTURA.md`; despliegue en `docs/DESPLIEGUE_
 - Un pedido cobrado y luego cancelado **no suma a las ventas** del cierre; se informa aparte. Repetir un cierre con el mismo `id` devuelve el ya guardado (idempotente, como `sendToKitchen`).
 - Despliegue: publicar primero el servidor (crea las tablas solo, al arrancar) y después la app; las tablets con la versión anterior no podrán enviar pedidos (falta el pago) hasta que recarguen.
 
+## Inventario
+
+- El inventario es un **documento único** en el servidor (`inventory_documents`), como el menú: cada cambio es una función pura de `src/domain/inventory/inventoryAdmin.js` aplicada de forma atómica por el almacén. Servidor y modo en memoria comparten esas funciones: una regla nueva va en el dominio, nunca solo en una capa.
+- **Todo se cuenta en porciones enteras** (`InventoryItem.stock`, recetas, ajustes). Una unidad rinde `portionsPerUnit` porciones; nunca guardar fracciones ni decimales. Para mostrar usar `formatPortions` / `describeStock`; para leer lo que escribe una persona, `parseWholeNumber` (no `parseColones`, que leería "1.5" como 15).
+- **El descuento va dentro de la transacción del pedido nuevo**: `orderStore.saveOrder(order, check, onCreated)` ejecuta `onCreated(tx)` solo al insertar (no en cambios de estado) y `inventoryStore.consumeForOrder(order, tx)` descuenta ahí. No descontar desde la tablet ni en un paso aparte. En modo en memoria lo hace `onOrderCreated` del repositorio de pedidos.
+- **Nunca bloquear una venta por falta de stock**: el stock puede quedar negativo. Sin receta no se descuenta. Los extras tienen su propia receta y descuentan con su propia cantidad.
+- Permiso `INVENTORY_MANAGE`: solo el administrador (no se asigna a ningún rol; `can` le da todo). Se refresca con el evento `inventory:changed` (`useInventory`), que también se emite al vender.
+- La tabla `inventory_documents` pasa por `lockDown`. Las recetas apuntan a ids del menú sin clave foránea; el servidor valida que el producto o extra exista al guardar una receta con líneas.
+- El inventario empieza **vacío** en producción y en memoria (no hay datos de ejemplo).
+
 ## Nombre del cliente en cada pedido
 
 - `Order.customerName` es **obligatorio** para enviar a cocina (`isValidCustomerName`: ≥ 2 caracteres y alguna letra). Se exige en tres capas: `changeOrderStatus` (dominio), `checkOrderWrite` (servidor y memoria) y el botón de Caja. Es inmutable tras el envío.

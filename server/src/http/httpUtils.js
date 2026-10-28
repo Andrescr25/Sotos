@@ -1,4 +1,5 @@
 import { CASH_CLOSING_ERROR } from '@/domain/cashClosing';
+import { INVENTORY_ERROR } from '@/domain/inventory';
 import { ORDER_ERROR } from '@/domain/orders';
 import { MENU_ERROR } from '@/domain/menu';
 import { USER_ERROR } from '@/domain/users';
@@ -30,6 +31,7 @@ export function statusForCode(code) {
     case MENU_ERROR.PRODUCT_NOT_FOUND:
     case MENU_ERROR.EXTRA_NOT_FOUND:
     case MENU_ERROR.NOTE_NOT_FOUND:
+    case INVENTORY_ERROR.ITEM_NOT_FOUND:
     case USER_ERROR.INVITATION_INVALID:
       return 404;
     case USER_ERROR.INVITATION_USED:
@@ -43,6 +45,7 @@ export function statusForCode(code) {
     case MENU_ERROR.DUPLICATE_NOTE:
     case MENU_ERROR.CATEGORY_NOT_EMPTY:
     case MENU_ERROR.MENU_NOT_EMPTY:
+    case INVENTORY_ERROR.DUPLICATE_NAME:
     case CASH_CLOSING_ERROR.NO_SALES:
       return 409;
     case COMMON_ERROR.RATE_LIMITED:

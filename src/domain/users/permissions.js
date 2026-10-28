@@ -20,6 +20,8 @@ export const PERMISSIONS = Object.freeze({
   MENU_VIEW: 'menu:view',
   /** Agregar, editar y eliminar platillos, bebidas, extras y categorías. */
   MENU_MANAGE: 'menu:manage',
+  /** Ver y administrar el inventario: insumos, stock y recetas. */
+  INVENTORY_MANAGE: 'inventory:manage',
   /** Ver usuarios y asignarles rol / habilitarlos. */
   USER_MANAGE: 'user:manage',
 });
