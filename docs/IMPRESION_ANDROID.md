@@ -114,7 +114,66 @@ Referencias de Google: [imprimir desde Chrome en Android](https://support.google
 - **Se canceló la impresión:** volver a imprimir el mismo comprobante. El sistema
   no muestra «impreso» porque abrir el diálogo no confirma una impresión física.
 
+## Impresora comprada: POS-80 (USB, 80 mm)
+
+Pruebas físicas del **27 de octubre de 2026**, hechas desde un Mac con la
+impresora conectada por USB, enviando bytes ESC/POS directos (`lp -o raw`).
+**No se han hecho pruebas desde la tablet Android ni con RawBT**: lo de abajo
+describe cómo se comporta la impresora, no el flujo final de Caja.
+
+**Identificación.** macOS la ve como `usb://Printer/POS-80`, con el identificador
+`MFG:Printer;MDL:POS-80;CMD:ESC/POS` y el ID USB `0x1FC9:0x2016`. No se encontró
+un manual del fabricante para ese ID; las pruebas se guiaron por manuales de
+impresoras genéricas de 80 mm con el mismo juego de comandos. Imprime **576
+puntos (72 mm)** de ancho útil sobre papel de 80 mm; la regla y el ticket
+confirmaron márgenes de unos 4 mm a cada lado.
+
+**Lo que se comprobó**
+
+| Prueba | Resultado |
+|---|---|
+| Rollo con la cara térmica hacia afuera | El papel avanza pero no imprime nada. Dar vuelta al rollo. |
+| `GS v 0` en un bloque de ~17 KB, precedido por una línea de texto | Sale bien. |
+| `GS v 0` con el ticket completo en un solo bloque de 74 KB | Basura (cada byte se imprime como un símbolo). Posible límite de tamaño, no confirmado. |
+| Imágenes al inicio del trabajo, sin texto antes | Ruido o basura en la primera banda. |
+| `ESC *` modo 33, bandas de 24 filas, ticket completo (74 KB) | Sale completo. Con rayas blancas si no se cambia la fuente. |
+| `ESC M 1` (fuente B) + `ESC 3 24` antes de las bandas | **Sin rayas blancas.** Según el manual, el espaciado no puede ser menor que la altura del carácter de la fuente activa; la fuente B es más baja que 24 puntos. |
+| Patrones artificiales (franjas, líneas de un píxel) | Basura sin causa conocida; imágenes reales sí imprimen. |
+
+**Receta que salió perfecta** (ticket de 80 mm, 43 bandas, 129 mm de alto):
+
+```text
+ESC @            reiniciar
+texto + LF       una línea corta de texto antes de la imagen
+ESC M 1          fuente B
+ESC 3 24         espaciado de 24 puntos
+por cada banda de 24 filas:
+  ESC * 33 nL nH   (576 columnas → nL=0x40, nH=0x02), seguido de 576 × 3 bytes, y LF
+ESC M 0 · ESC 2  restaurar fuente y espaciado
+LF LF LF · GS V 66 3   avanzar y corte parcial
+```
+
+La imagen se genera en 1 bit (umbral 170) a 576 puntos de ancho, tal como la
+dibuja Chrome a 72 mm.
+
+**Colas de macOS.** La cola que crea macOS al agregar la impresora usa el
+controlador "Intellitech IntelliBar Label Printer" (etiquetas, 4×6") y **no sirve**
+para imprimir desde Chrome en el Mac. macOS no trae controladores para esta
+impresora; para pruebas se envía directo con `lp -o raw`.
+
+**Lo que falta para dar la impresión por buena en la tablet**
+1. Probar Chrome → RawBT → impresora con un ticket **corto** primero. Si RawBT
+   envía la imagen entera en un solo bloque grande, puede fallar como el bloque
+   de 74 KB; revisar en RawBT el método de imagen (`ESC *` o `GS v 0`) y las
+   opciones de compatibilidad.
+2. Confirmar el modelo con la hoja de autoprueba (mantener FEED al encender).
+3. Si la impresora tiene modo de caracteres chino/alfanumérico, comprobar el modo.
+
+Fuentes consultadas: [manual de programación POS-80XX](https://crystals.ru/upload/iblock/b5f/b709ckr9z4qlqrgltiuspt3bcklckpn5/Instruktsiya-po-programmirovaniyu.pdf),
+[manual de usuario de una 80 mm con el mismo juego de comandos](https://gzhls.at/blob/ldb/b/9/0/a/d396104eeb22b397a28a5bdba4e51ac2b027.pdf),
+[perfil ZJ-5870 en escpos-printer-db](https://github.com/receipt-print-hq/escpos-printer-db/blob/master/data/profile/ZJ-5870.yml),
+[controlador de código abierto zj-58](https://github.com/klirichek/zj-58).
+
 Esta integración está implementada para el **navegador**. Las apps nativas de
 Expo conservan la vista del comprobante e indican abrir Chrome para imprimir.
-No se han hecho pruebas con hardware físico. La validación final requiere la
-impresora elegida y la tablet que se usará en el local.
+La validación final requiere la tablet que se usará en el local.
