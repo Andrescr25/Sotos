@@ -1,3 +1,4 @@
+import { CASH_CLOSING_ERROR } from '@/domain/cashClosing';
 import { ORDER_ERROR } from '@/domain/orders';
 import { MENU_ERROR } from '@/domain/menu';
 import { USER_ERROR } from '@/domain/users';
@@ -42,6 +43,7 @@ export function statusForCode(code) {
     case MENU_ERROR.DUPLICATE_NOTE:
     case MENU_ERROR.CATEGORY_NOT_EMPTY:
     case MENU_ERROR.MENU_NOT_EMPTY:
+    case CASH_CLOSING_ERROR.NO_SALES:
       return 409;
     case COMMON_ERROR.RATE_LIMITED:
       return 429;

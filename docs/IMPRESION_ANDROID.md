@@ -6,15 +6,20 @@ mediante el servicio de impresión de Android.
 
 La factura electrónica de Hacienda se implementará en otra etapa, según lo
 acordado. El ticket actual muestra «Comprobante del pedido» y no presenta un
-consecutivo fiscal, impuestos calculados, un pago confirmado ni una aceptación
-que el sistema todavía no genera.
+consecutivo fiscal, impuestos calculados ni una aceptación de Hacienda que el
+sistema todavía no genera. Sí muestra cómo se pagó el pedido (efectivo, tarjeta
+o SINPE Móvil) y, en efectivo, lo recibido y el vuelto.
 
 ## Flujo de Caja
 
 1. Armar el pedido y escribir el nombre del cliente.
-2. Enviar a cocina. Si falla el envío, se conserva el borrador y no se ofrece
-   imprimir un comprobante de ese pedido.
-3. Se abre el resumen del pedido confirmado: elegir papel de **80 mm** o **58 mm**.
+2. Enviar a cocina: se abre el **cobro**. Elegir efectivo, tarjeta o SINPE Móvil
+   (en efectivo, escribir con cuánto paga el cliente para ver el vuelto) y
+   confirmar el pago; solo entonces el pedido sale a cocina. Si falla el envío,
+   se conservan el borrador y el cobro, y no se ofrece imprimir un comprobante
+   de ese pedido.
+3. Se abre el resumen del pedido confirmado, con la forma de pago y el vuelto
+   para entregar: elegir papel de **80 mm** o **58 mm**.
 4. Pulsar **Imprimir comprobante**. Se abre una pestaña con solo el ticket y el
    cuadro de impresión del navegador.
 5. Seleccionar la impresora y el papel correspondiente, y confirmar en Android.
@@ -28,7 +33,9 @@ hay un historial de comprobantes entregados para reimprimir pedidos anteriores.
 
 El ticket conserva los nombres y precios guardados con el pedido, cantidades,
 extras con su cantidad propia, observaciones, nombre del cliente, persona que lo
-atendió, fecha/hora en Costa Rica y total en colones. No depende del menú vigente.
+atendió, fecha/hora en Costa Rica, total en colones y la forma de pago (con
+recibido y vuelto si fue en efectivo). No depende del menú vigente. Los pedidos
+anteriores al módulo de cobro se imprimen sin la sección de pago.
 
 ## Equipo recomendado y comparación
 

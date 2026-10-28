@@ -1,14 +1,17 @@
 import { createDraftOrder, createOrderItem, addItem, setCustomerName, sendOrderToKitchen } from '@/domain/orders';
+import { PAYMENT_METHOD } from '@/domain/payments';
 import { createReceiptService } from './receiptService';
 import { buildOrderReceiptDocument } from './receipts/buildOrderReceiptDocument';
 
 const cashier = { id: 'cashier-1', name: 'María', role: 'cashier' };
-function sentOrder() {
+// El pedido de ejemplo suma ₡7.500: el cliente paga con ₡10.000 y recibe ₡2.500 de vuelto.
+const PAYMENT = { method: PAYMENT_METHOD.CASH, tendered: 10_000 };
+function sentOrder(payment = PAYMENT) {
   const product = { id: 'burger', name: 'Hamburguesa', price: 3500, kind: 'dish', active: true, extraIds: ['cheese'] };
   let order = createDraftOrder({ createdBy: cashier });
   order = addItem(order, createOrderItem({ product, quantity: 2, extras: [{ extra: { id: 'cheese', name: 'Queso', price: 500 }, quantity: 1 }], notes: ['Sin cebolla'] }));
   order = setCustomerName(order, 'Ana Mora');
-  return sendOrderToKitchen(order, { number: 12, user: cashier, now: new Date('2026-10-14T00:30:00Z') });
+  return sendOrderToKitchen(order, { payment, number: 12, user: cashier, now: new Date('2026-10-14T00:30:00Z') });
 }
 
 describe('comprobantes del pedido', () => {
@@ -24,8 +27,35 @@ describe('comprobantes del pedido', () => {
     expect(html).toContain('₡7.500');
     expect(html).toContain('Sin cebolla');
     expect(html).toContain('No es una factura electrónica.');
-    expect(html).not.toContain('Pagado');
     expect(html).not.toContain('IVA');
+  });
+
+  it('muestra cómo se pagó: en efectivo, lo recibido y el vuelto', () => {
+    const html = buildOrderReceiptDocument(sentOrder());
+
+    expect(html).toContain('<span>Pago</span><span>Efectivo</span>');
+    expect(html).toContain('<span>Recibido</span><span>₡10.000</span>');
+    expect(html).toContain('<strong>Vuelto</strong>');
+    expect(html).toContain('<strong>₡2.500</strong>');
+  });
+
+  it.each([
+    [PAYMENT_METHOD.CARD, 'Tarjeta'],
+    [PAYMENT_METHOD.SINPE, 'SINPE Móvil'],
+  ])('con %s solo indica la forma de pago, sin recibido ni vuelto', (method, label) => {
+    const html = buildOrderReceiptDocument(sentOrder({ method }));
+
+    expect(html).toContain(`<span>Pago</span><span>${label}</span>`);
+    expect(html).not.toContain('Recibido');
+    expect(html).not.toContain('Vuelto');
+  });
+
+  it('un pedido anterior al módulo de pagos se imprime sin la sección de pago', () => {
+    const { payment, ...legacy } = sentOrder();
+    const html = buildOrderReceiptDocument(legacy);
+
+    expect(html).toContain('Pedido #012');
+    expect(html).not.toContain('class="payment"');
   });
 
   it('escapa nombres y observaciones para que no ejecuten HTML en el navegador', () => {

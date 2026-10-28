@@ -34,19 +34,25 @@ export function createOrderService({ orderRepository, now = () => new Date() }) 
 
   return {
     /**
-     * Cajero: envía un borrador a cocina. Cocina lo recibe vía `subscribe`.
+     * Cajero: cobra el pedido y lo envía a cocina. Cocina lo recibe vía
+     * `subscribe`. Sin un pago confirmado el pedido no sale.
      * @param {import('@/domain/orders/order').Order} draft
      * @param {import('@/domain/users/roles').User} user
+     * @param {{ method: string, tendered?: number }} payment  forma de pago y, en efectivo, lo que entregó el cliente
      */
-    async sendToKitchen(draft, user) {
+    async sendToKitchen(draft, user, payment) {
       // Reintento seguro: si el servidor guardó el pedido pero la respuesta se
       // perdió (WiFi inestable), reenviar devuelve el pedido ya guardado en
       // lugar de duplicarlo o fallar.
       const stored = await orderRepository.getById(draft.id);
       if (stored && stored.status !== ORDER_STATUS.DRAFT) return stored;
 
+      // Se valida con un número provisional antes de pedir el consecutivo: un
+      // pago o un pedido inválido no debe gastar un número de pedido.
+      sendOrderToKitchen(draft, { number: 1, user, payment, now: now() });
+
       const number = await orderRepository.nextOrderNumber();
-      const sent = sendOrderToKitchen(draft, { number, user, now: now() });
+      const sent = sendOrderToKitchen(draft, { number, user, payment, now: now() });
       return orderRepository.save(sent);
     },
 

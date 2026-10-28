@@ -5,10 +5,12 @@ import { describeConnectionProblem, getPoolOptions, loadConfig } from './config'
 import { explainConnectionError, isDatabaseError } from './diagnostics/databaseCheck';
 import { createApp } from './createApp';
 import { hashPassword } from './security/passwords';
+import { createMemoryCashStore } from './store/createMemoryCashStore';
 import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
 import { createPgDb } from './store/createPgDb';
+import { createPostgresCashStore } from './store/createPostgresCashStore';
 import { createPostgresMenuStore } from './store/createPostgresMenuStore';
 import { createPostgresStore } from './store/createPostgresStore';
 import { createPostgresUserStore } from './store/createPostgresUserStore';
@@ -27,6 +29,7 @@ async function main() {
   let orderStore;
   let userStore;
   let menuStore;
+  let cashStore;
   const inMemory = !config.databaseUrl;
 
   if (inMemory) {
@@ -35,6 +38,7 @@ async function main() {
     userStore = createMemoryUserStore();
     // En desarrollo local el menú arranca con datos de ejemplo.
     menuStore = createMemoryMenuStore(menuSeed);
+    cashStore = createMemoryCashStore({ orderStore });
   } else {
     const problem = describeConnectionProblem(config.databaseUrl);
     if (problem) console.warn(problem);
@@ -45,13 +49,15 @@ async function main() {
     userStore = createPostgresUserStore(db);
     // En producción el menú empieza vacío: lo arma el administrador.
     menuStore = createPostgresMenuStore(db);
+    cashStore = createPostgresCashStore(db);
   }
 
   await orderStore.init();
   await userStore.init();
   await menuStore.init();
+  await cashStore.init(); // después de los pedidos: lee su tabla
 
-  const app = createApp({ orderStore, userStore, menuStore, config });
+  const app = createApp({ orderStore, userStore, menuStore, cashStore, config });
 
   if (inMemory) {
     await seedDevelopmentUsers(userStore);
@@ -78,6 +84,7 @@ async function main() {
     await orderStore.close();
     await userStore.close();
     await menuStore.close();
+    await cashStore.close();
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));

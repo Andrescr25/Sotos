@@ -14,6 +14,18 @@
  * @property {(day: string) => Promise<number>} nextOrderNumber  atómico; `day` = "YYYY-MM-DD"
  * @property {() => Promise<void>} close
  *
+ * @typedef {Object} CashStore
+ * @property {() => Promise<void>} init  crea el esquema si no existe
+ * @property {() => Promise<{ orders: import('@/domain/orders/order').Order[], previous: import('@/domain/cashClosing').CashClosing | null }>} getPending
+ *   Pedidos con cobro que ningún cierre ha cubierto, y el último cierre.
+ * @property {(id: string, build: (pending: { orders: import('@/domain/orders/order').Order[], previous: import('@/domain/cashClosing').CashClosing | null }) => import('@/domain/cashClosing').CashClosing) => Promise<import('@/domain/cashClosing').CashClosing>} createClosing
+ *   Atómico y de uno en uno: lee lo pendiente, arma el cierre con `build` y
+ *   marca esos pedidos como cubiertos. Si `build` lanza no se guarda nada.
+ *   Si ya existe un cierre con ese `id` lo devuelve sin duplicarlo.
+ * @property {(options?: { limit?: number }) => Promise<import('@/domain/cashClosing').CashClosing[]>} listClosings
+ *   Del más reciente al más antiguo.
+ * @property {() => Promise<void>} close
+ *
  * @typedef {Object} MenuStore
  * @property {() => Promise<void>} init
  * @property {() => Promise<import('@/domain/menu/types').Menu>} getMenu  vacío si aún no hay menú

@@ -20,8 +20,10 @@ import {
   setItemQuantity,
   setOrderNote,
 } from '@/domain/orders';
+import { PAYMENT_METHOD } from '@/domain/payments';
 
 const [cashier, cook, admin] = usersSeed;
+const PAYMENT = { method: PAYMENT_METHOD.CARD };
 const product = (id) => findProduct(menuSeed, id);
 const extra = (id) => menuSeed.extras.find((candidate) => candidate.id === id);
 
@@ -225,14 +227,14 @@ describe('nombre del cliente (obligatorio)', () => {
     );
 
     expectOrderError(
-      () => sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }),
+      () => sendOrderToKitchen(order, { payment: PAYMENT, number: 1, user: cashier, now: T0 }),
       ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
     );
 
     for (const invalid of ['   ', 'A', '...', '12', '--']) {
       order = setCustomerName(order, invalid, T0);
       expectOrderError(
-        () => sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }),
+        () => sendOrderToKitchen(order, { payment: PAYMENT, number: 1, user: cashier, now: T0 }),
         ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
       );
     }
@@ -246,19 +248,110 @@ describe('nombre del cliente (obligatorio)', () => {
         T0,
       );
       order = setCustomerName(order, valid, T0);
-      expect(sendOrderToKitchen(order, { number: 1, user: cashier, now: T0 }).customerName).toBe(valid);
+      expect(sendOrderToKitchen(order, { payment: PAYMENT, number: 1, user: cashier, now: T0 }).customerName).toBe(valid);
     }
   });
 
   it('no se puede cambiar una vez enviado', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: T0 });
     expectOrderError(() => setCustomerName(sent, 'Otro', T0), ORDER_ERROR.NOT_EDITABLE);
+  });
+});
+
+describe('pago (obligatorio antes de enviar a cocina)', () => {
+  it('un borrador nuevo no tiene pago', () => {
+    expect(createDraftOrder({ createdBy: cashier, now: T0 }).payment).toBeNull();
+  });
+
+  it('no se envía sin pago confirmado', () => {
+    expectOrderError(
+      () => sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 }),
+      ORDER_ERROR.PAYMENT_REQUIRED,
+    );
+  });
+
+  it('cobra el total del pedido y guarda quién recibió el pago', () => {
+    const order = buildExampleOrder();
+    const sent = sendOrderToKitchen(order, {
+      number: 1,
+      user: cashier,
+      payment: { method: PAYMENT_METHOD.CASH, tendered: 20_000 },
+      now: minutesAfter(1),
+    });
+
+    expect(sent.payment).toEqual({
+      method: 'cash',
+      amount: order.totals.total,
+      tendered: 20_000,
+      change: 20_000 - order.totals.total,
+      paidAt: minutesAfter(1).toISOString(),
+      receivedBy: { id: cashier.id, name: cashier.name },
+    });
+  });
+
+  it('no envía si el efectivo no alcanza, ni con una forma de pago inventada', () => {
+    const order = buildExampleOrder();
+    const send = (payment) => () => sendOrderToKitchen(order, { number: 1, user: cashier, payment, now: T0 });
+
+    expect(send({ method: PAYMENT_METHOD.CASH, tendered: order.totals.total - 1 })).toThrow(
+      expect.objectContaining({ code: 'payment_insufficient' }),
+    );
+    expect(send({ method: PAYMENT_METHOD.CASH })).toThrow(expect.objectContaining({ code: 'payment_invalid_amount' }));
+    expect(send({ method: 'cheque' })).toThrow(expect.objectContaining({ code: 'payment_invalid_method' }));
+  });
+
+  it('tarjeta y SINPE Móvil cobran el total exacto', () => {
+    const order = buildExampleOrder();
+    for (const method of [PAYMENT_METHOD.CARD, PAYMENT_METHOD.SINPE]) {
+      const sent = sendOrderToKitchen(order, { number: 1, user: cashier, payment: { method }, now: T0 });
+      expect(sent.payment).toMatchObject({ method, amount: order.totals.total, change: 0 });
+    }
+  });
+
+  it('el pago no sustituye a las otras reglas: pedido vacío y nombre siguen siendo obligatorios', () => {
+    const empty = setCustomerName(createDraftOrder({ createdBy: cashier, now: T0 }), 'María', T0);
+    expectOrderError(
+      () => sendOrderToKitchen(empty, { number: 1, user: cashier, payment: PAYMENT, now: T0 }),
+      ORDER_ERROR.EMPTY_ORDER,
+    );
+
+    const unnamed = addItem(
+      createDraftOrder({ createdBy: cashier, now: T0 }),
+      createOrderItem({ product: product('prod-papas') }),
+      T0,
+    );
+    expectOrderError(
+      () => sendOrderToKitchen(unnamed, { number: 1, user: cashier, payment: PAYMENT, now: T0 }),
+      ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
+    );
+  });
+
+  it('un pago que no cuadra con el total no deja pasar el pedido', () => {
+    const order = buildExampleOrder();
+    const stalePayment = {
+      method: 'card',
+      amount: order.totals.total - 500,
+      tendered: order.totals.total - 500,
+      change: 0,
+      paidAt: T0.toISOString(),
+      receivedBy: { id: cashier.id, name: cashier.name },
+    };
+    expectOrderError(
+      () => changeOrderStatus({ ...order, payment: stalePayment }, ORDER_STATUS.NEW, { user: cashier, now: T0 }),
+      ORDER_ERROR.PAYMENT_REQUIRED,
+    );
+  });
+
+  it('el pago queda intacto al avanzar el pedido por cocina', () => {
+    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, payment: PAYMENT, now: T0 });
+    const started = changeOrderStatus(sent, ORDER_STATUS.IN_PROGRESS, { user: cook, now: minutesAfter(2) });
+    expect(started.payment).toEqual(sent.payment);
   });
 });
 
 describe('envío a cocina y estados', () => {
   it('envía el pedido: pasa a Nuevo, recibe número y queda visible en cocina', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 24, user: cashier, now: minutesAfter(1) });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 24, user: cashier, now: minutesAfter(1) });
 
     expect(sent.status).toBe(ORDER_STATUS.NEW);
     expect(sent.number).toBe(24);
@@ -270,13 +363,13 @@ describe('envío a cocina y estados', () => {
   it('no envía un pedido vacío', () => {
     const empty = createDraftOrder({ createdBy: cashier, now: T0 });
     expectOrderError(
-      () => sendOrderToKitchen(empty, { number: 1, user: cashier }),
+      () => sendOrderToKitchen(empty, { payment: PAYMENT, number: 1, user: cashier }),
       ORDER_ERROR.EMPTY_ORDER,
     );
   });
 
   it('no permite editar un pedido ya enviado', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: T0 });
     expectOrderError(
       () => setItemQuantity(sent, sent.items[0].id, 3, T0),
       ORDER_ERROR.NOT_EDITABLE,
@@ -284,7 +377,7 @@ describe('envío a cocina y estados', () => {
   });
 
   it('recorre el flujo completo Nuevo → En preparación → Listo → Entregado', () => {
-    let order = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: minutesAfter(0) });
+    let order = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: minutesAfter(0) });
     order = changeOrderStatus(order, ORDER_STATUS.IN_PROGRESS, { user: cook, now: minutesAfter(2) });
     order = changeOrderStatus(order, ORDER_STATUS.READY, { user: cook, now: minutesAfter(12) });
     order = changeOrderStatus(order, ORDER_STATUS.DELIVERED, { user: cashier, now: minutesAfter(14) });
@@ -302,7 +395,7 @@ describe('envío a cocina y estados', () => {
   });
 
   it('rechaza saltarse estados o retroceder', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: T0 });
 
     expectOrderError(
       () => changeOrderStatus(sent, ORDER_STATUS.READY, { user: cook }),
@@ -315,14 +408,14 @@ describe('envío a cocina y estados', () => {
   });
 
   it('respeta permisos por rol', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: T0 });
 
     expectOrderError(
       () => changeOrderStatus(sent, ORDER_STATUS.IN_PROGRESS, { user: cashier }),
       ORDER_ERROR.FORBIDDEN,
     );
     expectOrderError(
-      () => sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cook }),
+      () => sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cook }),
       ORDER_ERROR.FORBIDDEN,
     );
     // El administrador tiene acceso total
@@ -332,7 +425,7 @@ describe('envío a cocina y estados', () => {
   });
 
   it('permite cancelar antes de un estado final pero no después', () => {
-    const sent = sendOrderToKitchen(buildExampleOrder(), { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(buildExampleOrder(), { payment: PAYMENT, number: 1, user: cashier, now: T0 });
     const cancelled = changeOrderStatus(sent, ORDER_STATUS.CANCELLED, { user: cashier, now: T0 });
 
     expect(cancelled.status).toBe(ORDER_STATUS.CANCELLED);
@@ -346,7 +439,7 @@ describe('envío a cocina y estados', () => {
     const draft = buildExampleOrder();
     expect(getElapsedSinceSent(draft, minutesAfter(5))).toBeNull();
 
-    const sent = sendOrderToKitchen(draft, { number: 1, user: cashier, now: T0 });
+    const sent = sendOrderToKitchen(draft, { payment: PAYMENT, number: 1, user: cashier, now: T0 });
     expect(getElapsedSinceSent(sent, minutesAfter(7))).toBe(7 * 60_000);
   });
 });

@@ -13,8 +13,10 @@ import {
   sendOrderToKitchen,
   setCustomerName,
 } from '@/domain/orders';
+import { PAYMENT_METHOD } from '@/domain/payments';
 
-const [cashier, cook] = usersSeed;
+const [cashier, cook, admin] = usersSeed;
+const PAYMENT = { method: PAYMENT_METHOD.CARD };
 const T0 = new Date('2026-10-12T18:00:00.000Z');
 const at = (minutes) => new Date(T0.getTime() + minutes * 60_000);
 
@@ -24,13 +26,13 @@ function sentOrder() {
     createOrderItem({ product: findProduct(menuSeed, 'prod-papas'), quantity: 2 }),
     T0,
   );
-  return sendOrderToKitchen(draft, { number: 7, user: cashier, now: at(1) });
+  return sendOrderToKitchen(draft, { payment: PAYMENT, number: 7, user: cashier, now: at(1) });
 }
 
 const codeOf = (verdict) => (verdict.ok ? null : verdict.code);
 
 describe('checkOrderActor', () => {
-  const [, , admin, pendingUser] = usersSeed;
+  const [, , , pendingUser] = usersSeed;
 
   it('acepta que el cajero de la sesión envíe su pedido', () => {
     expect(checkOrderActor(null, sentOrder(), cashier)).toEqual({ ok: true });
@@ -63,6 +65,12 @@ describe('checkOrderActor', () => {
     expect(checkOrderActor(existing, byAdmin, admin)).toEqual({ ok: true });
   });
 
+  it('rechaza un pago registrado a nombre de otra persona', () => {
+    const order = sentOrder();
+    const signedByOther = { ...order, payment: { ...order.payment, receivedBy: { id: admin.id, name: admin.name } } };
+    expect(codeOf(checkOrderActor(null, signedByOther, cashier))).toBe(ORDER_ERROR.FORBIDDEN);
+  });
+
   it('una cuenta sin rol no puede guardar nada', () => {
     const order = sentOrder();
     expect(codeOf(checkOrderActor(null, order, pendingUser))).toBe(ORDER_ERROR.FORBIDDEN);
@@ -82,6 +90,20 @@ describe('checkOrderWrite — creación', () => {
     );
     const { customerName, ...withoutField } = order; // un cliente de una versión vieja de la app
     expect(codeOf(checkOrderWrite(null, withoutField))).toBe(ORDER_ERROR.CUSTOMER_NAME_REQUIRED);
+  });
+
+  it('rechaza un pedido sin pago o con un pago que no cuadra con el total', () => {
+    const order = sentOrder();
+    const { payment, ...withoutPayment } = order; // un cliente de una versión vieja de la app
+    expect(codeOf(checkOrderWrite(null, withoutPayment))).toBe(ORDER_ERROR.PAYMENT_REQUIRED);
+    expect(codeOf(checkOrderWrite(null, { ...order, payment: null }))).toBe(ORDER_ERROR.PAYMENT_REQUIRED);
+    expect(codeOf(checkOrderWrite(null, { ...order, payment: { ...payment, amount: payment.amount - 1 } }))).toBe(
+      ORDER_ERROR.PAYMENT_REQUIRED,
+    );
+    // Un vuelto inventado: dice que entregó más de lo que cobró sin que cuadre.
+    expect(codeOf(checkOrderWrite(null, { ...order, payment: { ...payment, change: 500 } }))).toBe(
+      ORDER_ERROR.PAYMENT_REQUIRED,
+    );
   });
 
   it('rechaza guardar un borrador como pedido nuevo', () => {
@@ -151,5 +173,21 @@ describe('checkOrderWrite — actualización', () => {
     const next = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
     const edited = { ...next, items: [{ ...next.items[0], quantity: 1 }] };
     expect(codeOf(checkOrderWrite(existing, edited))).toBe(ORDER_ERROR.INVALID_ORDER);
+  });
+
+  it('rechaza cambiar el pago de un pedido ya enviado', () => {
+    const existing = sentOrder();
+    const next = changeOrderStatus(existing, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
+    const altered = { ...next.payment, method: 'cash', tendered: next.payment.amount + 5_000, change: 5_000 };
+    expect(codeOf(checkOrderWrite(existing, { ...next, payment: altered }))).toBe(ORDER_ERROR.INVALID_ORDER);
+    expect(codeOf(checkOrderWrite(existing, { ...next, payment: null }))).toBe(ORDER_ERROR.INVALID_ORDER);
+  });
+
+  it('un pedido guardado antes de existir el pago sigue avanzando sin él', () => {
+    const { payment, ...legacy } = sentOrder();
+    const next = changeOrderStatus(legacy, ORDER_STATUS.IN_PROGRESS, { user: cook, now: at(2) });
+
+    expect(next.payment).toBeUndefined();
+    expect(checkOrderWrite(legacy, next)).toEqual({ ok: true });
   });
 });

@@ -9,10 +9,12 @@ existen, cómo fluye un pedido y dónde se enchufan las funciones futuras.
 observaciones, cálculo de totales, envío a cocina, estados, quién tomó el
 pedido y cuándo, cuentas con acceso asignado por el administrador, pantallas de
 caja, cocina, administración de usuarios y **gestión del menú** (platillos,
-bebidas, extras, categorías y observaciones frecuentes), e impresión opcional
-de comprobantes de pedidos enviados desde Chrome Android.
+bebidas, extras, categorías y observaciones frecuentes), **cobro del pedido
+antes de enviarlo a cocina** (efectivo con cálculo de vuelto, tarjeta y SINPE
+Móvil), **cierre de caja** (cuadre del efectivo e historial de cierres) e
+impresión opcional de comprobantes de pedidos enviados desde Chrome Android.
 
-**No incluye todavía:** facturación, inventario, reportes, cierres de caja,
+**No incluye todavía:** facturación, inventario, reportes,
 contabilidad, mesas, pagos, división de cuentas, delivery.
 
 ## 2. Stack
@@ -41,7 +43,7 @@ src/
 │
 ├── features/       UI por área: pantallas, componentes y hooks propios.
 │   ├── auth/       AuthProvider, login, registro, acceso pendiente
-│   ├── cashier/    toma de pedidos y entrega
+│   ├── cashier/    toma de pedidos, cobro, entrega y cierre de caja
 │   ├── kitchen/    tablero de cocina
 │   ├── orders/     piezas compartidas: lista en vivo, detalle de líneas, estado
 │   ├── menu/       useMenu: el menú en vivo (lo usan Caja y Administración)
@@ -49,15 +51,17 @@ src/
 │   └── admin/      inicio, usuarios y accesos, y gestión del menú
 │
 ├── services/       Casos de uso: combinan dominio + repositorios.
-│   └── orderService, authService, userService, menuService
+│   └── orderService, authService, userService, menuService, cashClosingService
 │
 ├── domain/         Reglas de negocio. JavaScript puro: sin React, sin red, sin I/O.
 │   ├── orders/     pedido, líneas, estados, precios, integridad, errores
+│   ├── payments/   formas de pago, cobro, vuelto y montos sugeridos
+│   ├── cashClosing/ resumen de ventas y cierre de caja (cuadre del efectivo)
 │   ├── menu/       categorías, productos, extras; operaciones del administrador y consultas
 │   └── users/      roles, permisos, acceso por zona, reglas de cuentas
 │
 ├── data/           Acceso a datos detrás de contratos.
-│   ├── contracts.js        Order/Auth/User/MenuRepository
+│   ├── contracts.js        Order/Auth/User/Menu/CashClosingRepository
 │   ├── memory/             En memoria (desarrollo sin servidor y pruebas)
 │   ├── remote/             Servidor: cliente HTTP, tiempo real, repositorios
 │   ├── session/            Token de sesión (llavero del sistema / localStorage)
@@ -86,7 +90,7 @@ server/             Backend (paquete Node independiente, se despliega en Render;
     ├── security/           Hash de contraseñas (scrypt) y tokens
     ├── http/               Rutas de auth, usuarios y pedidos; permisos; límite de intentos
     ├── realtime/           Canal WebSocket (sesión, latido, difusión por rol)
-    └── store/              Almacenes de pedidos, usuarios y menú: Postgres y memoria
+    └── store/              Almacenes de pedidos, usuarios, menú y cierres de caja: Postgres y memoria
 ```
 
 El servidor **reutiliza `src/domain`** (se empaqueta con esbuild, alias `@/`):
@@ -113,7 +117,10 @@ Category 1 ───< Product >───< Extra            (Product.extraIds)
                    │ productId (+ copia de nombre y precio)
 User ───< Order 1 ───< OrderItem 1 ───< OrderItemExtra
   (createdBy)  │
-               └───< StatusChange               (statusHistory)
+               ├───< StatusChange               (statusHistory)
+               └──── Payment                    (cobro; obligatorio para enviar a cocina)
+
+CashClosing ──── cubre los pedidos cobrados desde el cierre anterior (cada uno, en un solo cierre)
 ```
 
 | Entidad | Campos clave |
@@ -124,7 +131,9 @@ User ───< Order 1 ───< OrderItem 1 ───< OrderItemExtra
 | **Menu** | `categories[]`, `products[]`, `extras[]`, `quickNotes[]` — un único documento |
 | **User** | `id`, `username`, `name`, `role` (`cashier`/`cook`/`admin` o **`null`**), `active`, `passwordSet`, `createdAt` |
 | **Invitation** | `tokenHash`, `userId`, `createdById`, `expiresAt`, `usedAt` (solo servidor) |
-| **Order** | `id`, `number`, `type`, `tableId`, `status`, `items[]`, **`customerName`**, `note`, `createdBy`, `createdAt`, `updatedAt`, `statusHistory[]`, `totals` |
+| **Order** | `id`, `number`, `type`, `tableId`, `status`, `items[]`, **`customerName`**, **`payment`**, `note`, `createdBy`, `createdAt`, `updatedAt`, `statusHistory[]`, `totals` |
+| **Payment** | `method` (`cash`/`card`/`sinpe`), `amount` (el total del pedido), `tendered` (lo que entregó el cliente), `change` (vuelto), `paidAt`, `receivedBy` |
+| **CashClosing** | `id`, `number` (consecutivo), `closedAt`, `closedBy`, `periodStart`, `sales` (totales por forma de pago y cancelados), `cash` (`openingFloat`, `cashSales`, `expected`, `counted`, `difference`), `note` |
 | **OrderItem** | `id`, `productId`, `name`*, `kind`*, `unitPrice`*, `quantity`, `extras[]`, `notes[]` |
 | **OrderItemExtra** | `extraId`, `name`*, `unitPrice`*, `quantity` |
 | **StatusChange** | `status`, `at`, `by` (quién y cuándo) |
@@ -150,6 +159,17 @@ menú después no altera pedidos ya tomados (clave para facturación e historial
   el servidor (`checkOrderWrite`) y la interfaz (el botón de enviar queda
   deshabilitado). No se puede cambiar después de enviado. Cocina y "Listos"
   lo muestran, y será el nombre de la factura cuando exista la facturación.
+- **Se cobra antes de cocina.** El pedido no sale de Caja hasta confirmar el pago
+  (`payment`, obligatorio para pasar de borrador a "nuevo"). El pago se calcula
+  con el total del pedido **en el momento de enviar** (`sendOrderToKitchen`), así
+  que no puede quedar desactualizado respecto a las líneas, y es inmutable
+  después. Lo exigen el dominio (`changeOrderStatus`), el servidor
+  (`checkOrderWrite` y `checkOrderActor`: el pago debe estar firmado por quien
+  inició sesión) y la interfaz (el modal de cobro). Los pedidos guardados antes
+  de existir el cobro no lo tienen y se conservan tal cual.
+- **Efectivo, tarjeta y SINPE Móvil.** En efectivo se registra lo que entregó el
+  cliente y se calcula el vuelto (`tendered - amount`); en tarjeta y SINPE se
+  cobra el total exacto. El **vuelto no es venta**: las ventas suman `amount`.
 - **El menú es un documento.** Se guarda completo (JSONB) y cada cambio del
   administrador es una función pura de `domain/menu` aplicada de forma atómica:
   dos administradores editando a la vez se aplican uno tras otro.
@@ -215,6 +235,7 @@ Invitar empleado: nombre, usuario, rol
 | Empezar preparación / marcar listo | — | ✅ | ✅ |
 | Marcar entregado | ✅ | — | ✅ |
 | Cancelar | ✅ | — | ✅ |
+| Cierre de caja (ver el cuadre, cerrar y consultar cierres) | ✅ | — | ✅ |
 | Gestionar usuarios y accesos | — | — | ✅ |
 
 Fuentes de verdad: `domain/users/permissions.js` (roles → permisos),
@@ -257,6 +278,8 @@ Fuentes de verdad: `domain/users/permissions.js` (roles → permisos),
 | `cancelled` | Cancelado | Cajero o Admin | No |
 
 Solo un borrador se puede editar. Una vez enviado, las líneas son inmutables.
+**Enviar = cobrar y enviar:** `DRAFT → NEW` solo ocurre con el pago confirmado
+(ver "Se cobra antes de cocina"); un pago inválido ni siquiera gasta el número del pedido.
 
 ## 7. Comunicación caja ↔ cocina
 
@@ -300,6 +323,9 @@ Todas las rutas exigen `Authorization: Bearer <token>`, salvo las marcadas.
 | `GET /orders/:id` | Un pedido | ver pedidos |
 | `PUT /orders/:id` | Guarda o avanza un pedido | según la transición |
 | `POST /orders/next-number` | Siguiente número del día (atómico) | enviar pedido |
+| `GET /cash-closings/pending` | Lo cobrado desde el último cierre, por forma de pago, y el fondo sugerido | cerrar caja |
+| `POST /cash-closings` | Cierra la caja: `{ id, openingFloat, countedCash, note }`. El servidor calcula todo lo demás; repetir el mismo `id` no duplica | cerrar caja |
+| `GET /cash-closings?limit=` | Cierres anteriores, del más reciente al más antiguo | cerrar caja |
 | `WS /realtime` | Eventos en vivo; primer mensaje `{type:'auth', token}` | sesión |
 
 **Eventos en tiempo real:** `order:saved` (a quien puede ver pedidos),
@@ -316,6 +342,11 @@ Administración cuando el administrador edita el menú: recargan solos).
 - **Sin datos incoherentes:** se verifican totales, historial y que las líneas
   de un pedido enviado no cambien.
 - **Números únicos:** el contador diario es una sola sentencia `UPSERT`.
+- **Un pedido, un cierre:** `cash_closing_orders` tiene como clave primaria el id
+  del pedido, y cada cierre se hace dentro de una transacción con un bloqueo
+  consultivo (`pg_advisory_xact_lock`): dos tablets cerrando a la vez no cubren
+  el mismo pedido dos veces. El cierre se calcula en el servidor con sus propios
+  pedidos; de la tablet solo se aceptan lo contado, el fondo inicial y una nota.
 
 **Cliente (`data/remote`)**
 
@@ -339,7 +370,8 @@ Administración cuando el administrador edita el menú: recargan solos).
 |---|---|
 | **Login** | Usuario y contraseña. Sin selector de rol y sin "Crear cuenta": las cuentas las crea el administrador. |
 | **Acceso pendiente** | Cuenta sin rol; se actualiza sola cuando el admin asigna acceso. |
-| **Caja** | Categorías → productos → (extras y observaciones) → resumen → enviar. Botón "Listos (n)" para entregar. Desde 960 px de espacio útil el resumen va a la derecha; en tamaños menores se apila debajo, con un acceso rápido «Ver pedido». |
+| **Caja** | Categorías → productos → (extras y observaciones) → resumen → **cobro** → cocina. Botón "Listos (n)" para entregar y "Cierre de caja". Desde 960 px de espacio útil el resumen va a la derecha; en tamaños menores se apila debajo, con un acceso rápido «Ver pedido». |
+| **Cierre de caja** | Lo cobrado desde el último cierre por forma de pago (efectivo, tarjeta, SINPE Móvil) y el cuadre del efectivo: fondo inicial + cobrado en efectivo = esperado; se cuenta el cajón y se muestra si cuadra, sobra o falta. Pide confirmación antes de cerrar y guarda el cierre. Debajo, el historial. Cajero y administrador. |
 | **Cocina** | Tablero Nuevos / En preparación / Listos con tarjetas grandes: número, hora, tiempo transcurrido (verde/ámbar/rojo), líneas con extras y observaciones, botón del siguiente paso. |
 | **Administración** | Inicio con atajos y aviso de cuentas pendientes; "Usuarios y accesos" para invitar empleados, asignar rol, habilitar y restablecer contraseñas. |
 | **Invitación** (empleado) | `/invitacion/<token>`: saluda por nombre, muestra su acceso y pide crear la contraseña. Maneja enlace inválido, vencido o ya usado. |
@@ -347,12 +379,45 @@ Administración cuando el administrador edita el menú: recargan solos).
 
 Los umbrales de color de la cocina están en `features/kitchen/config.js`.
 
+### Cobro del pedido
+
+"Enviar pedido a cocina" abre el modal de cobro (`PaymentSheet`). Se elige efectivo,
+tarjeta o SINPE Móvil. En efectivo se escribe "con cuánto paga el cliente" (o se
+elige *Exacto* o un monto sugerido: `suggestTenderedAmounts`) y se ve el **vuelto**
+al instante, o cuánto falta; el botón de confirmar solo se habilita con un pago
+válido. Al confirmar, el pedido se guarda con su pago y sale a cocina en el mismo
+paso. Si falla, el error se muestra dentro del modal, que sigue abierto con lo
+escrito; "Volver al pedido" cancela sin enviar nada. El comprobante en pantalla
+repite la forma de pago, lo recibido y el vuelto, y el ticket impreso también.
+
+### Cierre de caja
+
+Una sola caja: el cierre cubre los pedidos con pago que ningún cierre anterior ha
+cubierto, de todos los cajeros.
+
+```
+esperado  = fondo inicial + cobrado en efectivo         (el vuelto no cuenta)
+diferencia = contado - esperado                          (+ sobra · − falta · 0 cuadra)
+```
+
+- El **fondo inicial** se sugiere con el efectivo contado en el cierre anterior y
+  se puede editar (por ejemplo si se retiró dinero para depositarlo).
+- Los pedidos **cobrados y luego cancelados** no suman a las ventas: se informan
+  aparte, porque ese dinero debió devolverse.
+- Los pedidos de antes del módulo de pagos no tienen cobro y no entran.
+- Cada cierre guarda quién lo hizo, cuándo, los totales por forma de pago y el
+  cuadre. El cierre se identifica con un `id` que genera la pantalla: si la
+  respuesta se pierde y se reintenta, el servidor devuelve el cierre ya guardado.
+- Sin pedidos cobrados por cerrar, el servidor responde `409 cash_no_sales`.
+- **Fuera de alcance por ahora:** retiros y gastos de caja, devoluciones,
+  propinas, descuentos, impresión del cierre y reportes por período.
+
 ### Impresión del pedido
 
 Después de que el servidor confirma el envío, Caja muestra `ReceiptSheet` con
 la opción de imprimir. `receiptService` genera el documento con los precios y
 datos guardados del pedido; `shared/printing/browserPrinter.web.js` abre una
-pestaña imprimible y el diálogo de Android. No escribe pedidos ni marca pagos.
+pestaña imprimible y el diálogo de Android. No escribe pedidos: el pago ya quedó registrado al enviarlo.
 Los errores de impresión se manejan aparte de los errores al enviar a cocina.
 El formato térmico usa `shared/theme/printing.js` y `shared/styles/print/receipt.js`.
 La facturación electrónica de Hacienda queda para una etapa posterior.
@@ -391,7 +456,7 @@ texto para elegir columnas o una composición apilada.
 | Función | Dónde encaja |
 |---|---|
 | **Mesas** | Nuevo `domain/tables`. `Order.tableId` y `ORDER_TYPE.DINE_IN` ya existen. |
-| **Pagos** | Nuevo `domain/payments` (`Payment` referencia `orderId`). El estado de pago es una dimensión **separada** del estado de cocina, para no mezclar ambos flujos. |
+| **Pagos (más allá del cobro simple)** | `domain/payments` ya registra el cobro único del pedido (`Order.payment`). Pendiente: propinas, descuentos, pago dividido o en varias formas, devoluciones. Si el pago se separa del pedido, sigue siendo una dimensión **distinta** del estado de cocina. |
 | **División de cuentas** | Agrupar líneas por cuenta (`checkId` en `OrderItem`) y calcular totales por cuenta en `pricing.js`. |
 | **Facturación electrónica** | Nuevo `domain/billing`. Los pedidos ya guardan precios, nombres y el **nombre del cliente** (`customerName`) como copia; impuestos (IVA) se calculan en `pricing.js`. |
 | **Inventario** | Nuevo `domain/inventory` (recetas/consumo). Reacciona a eventos de `orderService` (p. ej. al pasar a `in_progress`); no modifica el flujo de pedidos. |

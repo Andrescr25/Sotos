@@ -1,4 +1,5 @@
 import { createId } from '@/shared/utils/createId';
+import { createPayment, isValidPayment } from '@/domain/payments';
 import { can } from '@/domain/users/permissions';
 import { cleanCustomerName, isValidCustomerName } from './customerName';
 import { ORDER_ERROR, OrderError } from './orderErrors';
@@ -29,6 +30,7 @@ import { ORDER_TYPE } from './orderType';
  * @property {import('./orderItem').OrderItem[]} items
  * @property {string} customerName  nombre del cliente: obligatorio para enviar a cocina
  * @property {string} note  observación general del pedido
+ * @property {import('@/domain/payments').Payment | null} payment  cobro confirmado; es obligatorio para enviar a cocina (pedidos viejos pueden no tenerlo)
  * @property {Actor} createdBy  quién tomó el pedido
  * @property {string} createdAt
  * @property {string} updatedAt
@@ -90,6 +92,7 @@ export function createDraftOrder({
     items: [],
     customerName: '',
     note: '',
+    payment: null,
     createdBy: actor,
     createdAt: at,
     updatedAt: at,
@@ -234,6 +237,16 @@ export function changeOrderStatus(order, nextStatus, { user, now = new Date() })
       'El pedido debe llevar el nombre del cliente',
     );
   }
+  if (
+    order.status === ORDER_STATUS.DRAFT &&
+    nextStatus === ORDER_STATUS.NEW &&
+    !isValidPayment(order.payment, order.totals.total)
+  ) {
+    throw new OrderError(
+      ORDER_ERROR.PAYMENT_REQUIRED,
+      'El pedido debe tener el pago confirmado antes de enviarse a cocina',
+    );
+  }
 
   const at = now.toISOString();
   return {
@@ -245,19 +258,36 @@ export function changeOrderStatus(order, nextStatus, { user, now = new Date() })
 }
 
 /**
- * Envía el pedido a cocina: DRAFT -> NEW y asigna el número consecutivo.
+ * Cobra el pedido y lo envía a cocina: DRAFT -> NEW, con el número consecutivo.
+ * El pago se registra con el total del pedido en este mismo instante, así que
+ * no puede quedar desactualizado respecto a las líneas.
  * @param {Order} order
  * @param {Object} params
  * @param {number} params.number consecutivo asignado por el repositorio
- * @param {import('@/domain/users/roles').User} params.user
+ * @param {import('@/domain/users/roles').User} params.user  quien cobra y envía
+ * @param {{ method: string, tendered?: number }} [params.payment]  forma de pago y, en efectivo, lo que entregó el cliente
  * @param {Date} [params.now]
  * @returns {Order}
  */
-export function sendOrderToKitchen(order, { number, user, now = new Date() }) {
+export function sendOrderToKitchen(order, { number, user, payment, now = new Date() }) {
   if (!Number.isInteger(number) || number < 1) {
     throw new OrderError(ORDER_ERROR.INVALID_NUMBER, 'El número de pedido no es válido');
   }
-  const sent = changeOrderStatus(order, ORDER_STATUS.NEW, { user, now });
+  // Sin usuario o sin pago no se arma nada: `changeOrderStatus` rechaza con el motivo correcto.
+  const charged =
+    payment && user
+      ? {
+          ...order,
+          payment: createPayment({
+            method: payment.method,
+            tendered: payment.tendered,
+            total: order.totals.total,
+            receivedBy: user,
+            now,
+          }),
+        }
+      : order;
+  const sent = changeOrderStatus(charged, ORDER_STATUS.NEW, { user, now });
   return { ...sent, number };
 }
 

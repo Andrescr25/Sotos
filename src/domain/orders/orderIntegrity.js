@@ -1,3 +1,4 @@
+import { isValidPayment } from '@/domain/payments';
 import { PERMISSIONS, can } from '@/domain/users/permissions';
 import { deepEqual } from '@/shared/utils/deepEqual';
 import { isValidCustomerName } from './customerName';
@@ -29,6 +30,9 @@ export function checkOrderActor(existing, incoming, user) {
   if (!existing && incoming.createdBy?.id !== user.id) {
     return fail('El pedido debe quedar a nombre de quien lo envía');
   }
+  if (!existing && incoming.payment?.receivedBy?.id !== user.id) {
+    return fail('El pago debe quedar a nombre de quien lo recibe');
+  }
 
   const permission = existing
     ? getTransitionPermission(existing.status, incoming.status)
@@ -46,8 +50,9 @@ export function checkOrderActor(existing, incoming, user) {
  *
  * - Un pedido llega al almacenamiento ya enviado a cocina (estado "new").
  * - Después solo puede avanzar por transiciones válidas, de una en una.
- * - Debe llevar el nombre del cliente.
- * - Las líneas, el número, el cliente y quién lo tomó no cambian una vez guardado.
+ * - Debe llevar el nombre del cliente y el pago confirmado, que cuadra con el total.
+ * - Las líneas, el número, el cliente, el pago y quién lo tomó no cambian una vez guardado.
+ *   (Los pedidos guardados antes de existir el pago no lo tienen y así se conservan.)
  * - `existing` es lo que hay guardado (o null) leído dentro de la misma
  *   transacción que la escritura: así se detectan escrituras concurrentes.
  *
@@ -103,6 +108,12 @@ export function checkOrderWrite(existing, incoming) {
     if (!isValidCustomerName(incoming.customerName)) {
       return fail(ORDER_ERROR.CUSTOMER_NAME_REQUIRED, 'El pedido debe llevar el nombre del cliente');
     }
+    if (!isValidPayment(incoming.payment, totals.total)) {
+      return fail(
+        ORDER_ERROR.PAYMENT_REQUIRED,
+        'El pedido debe tener el pago confirmado y por el total del pedido',
+      );
+    }
     return { ok: true };
   }
 
@@ -137,11 +148,12 @@ export function checkOrderWrite(existing, incoming) {
     incoming.customerName === existing.customerName &&
     incoming.createdAt === existing.createdAt &&
     incoming.createdBy?.id === existing.createdBy.id &&
-    deepEqual(incoming.items, existing.items);
+    deepEqual(incoming.items, existing.items) &&
+    deepEqual(incoming.payment ?? null, existing.payment ?? null);
   if (!unchanged) {
     return fail(
       ORDER_ERROR.INVALID_ORDER,
-      'Un pedido enviado a cocina no puede cambiar sus productos ni su número',
+      'Un pedido enviado a cocina no puede cambiar sus productos, su número ni su pago',
     );
   }
 

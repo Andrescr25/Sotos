@@ -96,6 +96,29 @@ export const USER_SCHEMA = [
 ];
 
 /**
+ * Cierres de caja. `cash_closings.data` guarda el cierre completo (JSONB).
+ * `cash_closing_orders` anota qué pedidos cubrió cada cierre: su clave primaria
+ * es el id del pedido, así que un pedido no puede entrar en dos cierres ni
+ * aunque dos tablets cierren a la vez. No lleva clave foránea a `orders`: los
+ * pedidos nunca se borran y así los almacenes no dependen del orden de arranque.
+ */
+export const CASH_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS cash_closings (
+     id        text PRIMARY KEY,
+     number    integer NOT NULL UNIQUE,
+     closed_at timestamptz NOT NULL,
+     data      jsonb NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS cash_closing_orders (
+     order_id   text PRIMARY KEY,
+     closing_id text NOT NULL REFERENCES cash_closings(id) ON DELETE CASCADE
+   )`,
+  `CREATE INDEX IF NOT EXISTS cash_closing_orders_closing_idx ON cash_closing_orders (closing_id)`,
+  ...lockDown('cash_closings'),
+  ...lockDown('cash_closing_orders'),
+];
+
+/**
  * El menú completo vive en un solo documento JSONB. Es pequeño (decenas o
  * cientos de productos), y así cada cambio del administrador es atómico y se
  * valida con las mismas funciones puras del dominio.

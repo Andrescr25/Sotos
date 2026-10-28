@@ -20,4 +20,10 @@ if (process.env.EXPO_PUBLIC_API_URL) {
   repositories = createInMemoryRepositories();
 }
 
-export const { orderRepository, authRepository, userRepository, menuRepository } = repositories;
+export const {
+  orderRepository,
+  authRepository,
+  userRepository,
+  menuRepository,
+  cashClosingRepository,
+} = repositories;

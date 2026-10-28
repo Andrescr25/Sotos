@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { createHttpClient } from '@/data/remote/createHttpClient';
 import { createRealtimeClient } from '@/data/remote/createRealtimeClient';
 import { createRemoteAccountRepositories } from '@/data/remote/createRemoteAccountRepositories';
+import { createRemoteCashClosingRepository } from '@/data/remote/createRemoteCashClosingRepository';
 import { createRemoteMenuRepository } from '@/data/remote/createRemoteMenuRepository';
 import { createRemoteOrderRepository } from '@/data/remote/createRemoteOrderRepository';
 import { createMemoryTokenStorage } from '@/data/session/createMemoryTokenStorage';
@@ -18,13 +19,20 @@ import {
   sendOrderToKitchen,
   setCustomerName,
 } from '@/domain/orders';
+import { CASH_CLOSING_ERROR } from '@/domain/cashClosing';
 import { MENU_ERROR } from '@/domain/menu';
+import { PAYMENT_ERROR, PAYMENT_METHOD } from '@/domain/payments';
 import { ROLES, USER_ERROR } from '@/domain/users';
+import { createCashClosingService } from '@/services/cashClosingService';
 import { createOrderService } from '@/services/orderService';
 import { createApp } from './createApp';
+import { createMemoryCashStore } from './store/createMemoryCashStore';
 import { createMemoryMenuStore } from './store/createMemoryMenuStore';
 import { createMemoryStore } from './store/createMemoryStore';
 import { createMemoryUserStore } from './store/createMemoryUserStore';
+
+/** Cobro con tarjeta: no necesita monto. */
+const PAYMENT = { method: PAYMENT_METHOD.CARD };
 
 function draftFor(user, customerName = 'María Pérez') {
   return addItem(
@@ -46,6 +54,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
   let orderStore;
   let userStore;
   let menuStore;
+  let cashStore;
   let app;
   let port;
   let baseUrl;
@@ -56,6 +65,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       orderStore,
       userStore,
       menuStore,
+      cashStore,
       config: { timeZone: 'America/Costa_Rica', loginRateLimit },
       heartbeatMs: 200,
     });
@@ -77,13 +87,16 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     const accounts = createRemoteAccountRepositories({ http, realtime, session });
     const orderRepository = createRemoteOrderRepository({ http, realtime });
     const menuRepository = createRemoteMenuRepository({ http, realtime });
+    const cashClosingRepository = createRemoteCashClosingRepository({ http });
     return {
       session,
       http,
       ...accounts,
       orderRepository,
       menuRepository,
+      cashClosingRepository,
       orderService: createOrderService({ orderRepository }),
+      cashClosingService: createCashClosingService({ cashClosingRepository }),
     };
   }
 
@@ -129,6 +142,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     orderStore = createMemoryStore();
     userStore = createMemoryUserStore();
     menuStore = createMemoryMenuStore();
+    cashStore = createMemoryCashStore({ orderStore });
     await startApp();
     await app.authService.ensureAdmin({ username: 'admin', password: 'admin123', name: 'Administrador' });
   });
@@ -553,7 +567,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
         setCustomerName(createDraftOrder({ createdBy: caja.user }), 'Luis Rojas'),
         createOrderItem({ product, quantity: 2 }),
       );
-      const sent = await caja.device.orderService.sendToKitchen(draft, caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draft, caja.user, PAYMENT);
 
       await repo.update('products', product.id, { name: 'Casado nuevo', price: 9999 });
       await repo.remove('products', product.id);
@@ -572,7 +586,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       const cocinaEvents = collect(cocina.device.orderRepository.subscribe);
       await waitFor(() => isConnected(cajaEvents) && isConnected(cocinaEvents), 'ambas conectadas');
 
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
 
       await waitFor(
         () => cocinaEvents.some((event) => event.type === 'order:saved' && event.order.id === sent.id),
@@ -601,19 +615,19 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
 
       // Sin nombre no sale de Caja (lo frena el dominio).
       await expect(
-        caja.device.orderService.sendToKitchen(draftFor(caja.user, ''), caja.user),
+        caja.device.orderService.sendToKitchen(draftFor(caja.user, ''), caja.user, PAYMENT),
       ).rejects.toMatchObject({ code: ORDER_ERROR.CUSTOMER_NAME_REQUIRED });
 
       // Un cliente que se salte esa regla tampoco logra guardarlo en el servidor.
       const forged = {
-        ...sendOrderToKitchen(draftFor(caja.user), { number: 1, user: caja.user }),
+        ...sendOrderToKitchen(draftFor(caja.user), { number: 1, user: caja.user, payment: PAYMENT }),
         customerName: '',
       };
       await expect(caja.device.orderRepository.save(forged)).rejects.toMatchObject({
         code: ORDER_ERROR.CUSTOMER_NAME_REQUIRED,
       });
 
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user, 'Ana Mora'), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user, 'Ana Mora'), caja.user, PAYMENT);
       expect(sent.customerName).toBe('Ana Mora');
       await waitFor(
         () => cocinaEvents.some((event) => event.type === 'order:saved' && event.order.id === sent.id),
@@ -625,7 +639,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     it('cada rol solo puede hacer lo suyo', async () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
       const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
 
       // El cajero no puede empezar la preparación aunque firme con su propio usuario.
       const startedBySomeoneElse = changeOrderStatus(sent, ORDER_STATUS.IN_PROGRESS, { user: { ...caja.user, role: ROLES.ADMIN } });
@@ -635,7 +649,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
 
       // El cocinero no puede enviar pedidos.
       await expect(
-        cocina.device.orderService.sendToKitchen(draftFor(cocina.user), cocina.user),
+        cocina.device.orderService.sendToKitchen(draftFor(cocina.user), cocina.user, PAYMENT),
       ).rejects.toMatchObject({ code: ORDER_ERROR.FORBIDDEN });
 
       expect((await caja.device.orderRepository.getById(sent.id)).status).toBe(ORDER_STATUS.NEW);
@@ -644,7 +658,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     it('nadie puede firmar un cambio a nombre de otra persona', async () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
       const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
 
       // El cocinero fabrica un cambio firmado por el cajero.
       const forged = changeOrderStatus(sent, ORDER_STATUS.CANCELLED, { user: caja.user });
@@ -658,9 +672,9 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       const cajaB = await staffWithRole(ROLES.CASHIER, 'caja2');
 
       const sent = await Promise.all([
-        cajaA.device.orderService.sendToKitchen(draftFor(cajaA.user), cajaA.user),
-        cajaB.device.orderService.sendToKitchen(draftFor(cajaB.user), cajaB.user),
-        cajaA.device.orderService.sendToKitchen(draftFor(cajaA.user), cajaA.user),
+        cajaA.device.orderService.sendToKitchen(draftFor(cajaA.user), cajaA.user, PAYMENT),
+        cajaB.device.orderService.sendToKitchen(draftFor(cajaB.user), cajaB.user, PAYMENT),
+        cajaA.device.orderService.sendToKitchen(draftFor(cajaA.user), cajaA.user, PAYMENT),
       ]);
 
       expect(sent.map((order) => order.number).sort()).toEqual([1, 2, 3]);
@@ -669,7 +683,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
     it('rechaza con conflicto un cambio basado en una copia vieja del pedido', async () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
       const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
 
       await cocina.device.orderService.startPreparation(sent.id, cocina.user);
 
@@ -685,7 +699,7 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
       const cocinaA = await staffWithRole(ROLES.COOK, 'cocina1');
       const cocinaB = await staffWithRole(ROLES.COOK, 'cocina2');
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
 
       const results = await Promise.allSettled([
         cocinaA.device.orderService.startPreparation(sent.id, cocinaA.user),
@@ -701,8 +715,8 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
       const draft = draftFor(caja.user);
 
-      const first = await caja.device.orderService.sendToKitchen(draft, caja.user);
-      const retry = await caja.device.orderService.sendToKitchen(draft, caja.user);
+      const first = await caja.device.orderService.sendToKitchen(draft, caja.user, PAYMENT);
+      const retry = await caja.device.orderService.sendToKitchen(draft, caja.user, PAYMENT);
 
       expect(retry.id).toBe(first.id);
       expect(retry.number).toBe(first.number);
@@ -721,11 +735,278 @@ describe('servidor de pedidos (HTTP + WebSocket)', () => {
       await startApp(port);
       await waitFor(() => isConnected(cocinaEvents), 'cocina se reconecta con su misma sesión');
 
-      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user);
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
       await waitFor(
         () => cocinaEvents.some((event) => event.type === 'order:saved' && event.order.id === sent.id),
         'cocina recibe el pedido tras reconectar',
       );
+    });
+  });
+
+  describe('cobro antes de cocina', () => {
+    it('sin pago confirmado el pedido no entra, ni aunque una tablet se salte la regla', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      // La tablet misma lo frena: el dominio exige el pago.
+      await expect(
+        caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user),
+      ).rejects.toMatchObject({ code: ORDER_ERROR.PAYMENT_REQUIRED });
+
+      // Una tablet modificada manda el pedido directo al servidor, sin pago o con uno que no cuadra.
+      const paid = sendOrderToKitchen(draftFor(caja.user), { number: 1, user: caja.user, payment: PAYMENT });
+      const forgeries = [
+        { ...paid, payment: null },
+        { ...paid, payment: { ...paid.payment, amount: 1, tendered: 1 } },
+        { ...paid, payment: { ...paid.payment, method: PAYMENT_METHOD.CASH, tendered: paid.payment.amount + 5_000, change: 0 } },
+      ];
+      for (const forged of forgeries) {
+        await expect(caja.device.orderRepository.save(forged)).rejects.toMatchObject({
+          code: ORDER_ERROR.PAYMENT_REQUIRED,
+        });
+      }
+      expect(await caja.device.orderRepository.list()).toHaveLength(0);
+    });
+
+    it('en efectivo guarda lo que entregó el cliente y el vuelto', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, {
+        method: PAYMENT_METHOD.CASH,
+        tendered: 20_000,
+      });
+
+      expect(sent.payment).toMatchObject({
+        method: 'cash',
+        amount: sent.totals.total,
+        tendered: 20_000,
+        change: 20_000 - sent.totals.total,
+        receivedBy: { id: caja.user.id },
+      });
+      const stored = await caja.device.orderRepository.getById(sent.id);
+      expect(stored.payment).toEqual(sent.payment);
+    });
+
+    it('un efectivo que no alcanza se rechaza sin gastar el número del pedido', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+
+      await expect(
+        caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, {
+          method: PAYMENT_METHOD.CASH,
+          tendered: 100,
+        }),
+      ).rejects.toMatchObject({ code: PAYMENT_ERROR.INSUFFICIENT });
+
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
+      expect(sent.number).toBe(1);
+    });
+
+    it('nadie registra un pago a nombre de otra persona', async () => {
+      const cajaA = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cajaB = await staffWithRole(ROLES.CASHIER, 'caja2');
+
+      // La caja B envía un pedido cuyo pago dice que lo recibió la caja A.
+      const order = sendOrderToKitchen(draftFor(cajaB.user), { number: 1, user: cajaB.user, payment: PAYMENT });
+      const forged = { ...order, payment: { ...order.payment, receivedBy: { id: cajaA.user.id, name: cajaA.user.name } } };
+
+      await expect(cajaB.device.orderRepository.save(forged)).rejects.toMatchObject({
+        code: ORDER_ERROR.FORBIDDEN,
+      });
+    });
+
+    it('el cambio de estado en cocina no altera el pago, y no se puede reescribir', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+      const sent = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
+
+      const started = await cocina.device.orderService.startPreparation(sent.id, cocina.user);
+      expect(started.payment).toEqual(sent.payment);
+
+      const rewritten = changeOrderStatus(started, ORDER_STATUS.READY, { user: cocina.user });
+      await expect(
+        cocina.device.orderRepository.save({
+          ...rewritten,
+          payment: { ...started.payment, method: PAYMENT_METHOD.CASH, tendered: started.payment.amount + 1, change: 1 },
+        }),
+      ).rejects.toMatchObject({ code: ORDER_ERROR.INVALID_ORDER });
+    });
+  });
+
+  describe('cierre de caja', () => {
+    /** Una caja que cobra un pedido en efectivo (₡20.000, con vuelto) y otro por SINPE Móvil. */
+    async function cashierWithSales() {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const cash = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, {
+        method: PAYMENT_METHOD.CASH,
+        tendered: 20_000,
+      });
+      const sinpe = await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, {
+        method: PAYMENT_METHOD.SINPE,
+      });
+      return { caja, cash, sinpe };
+    }
+
+    const closingInput = (service, overrides = {}) => ({
+      id: service.newClosingId(),
+      openingFloat: 10_000,
+      countedCash: 17_000,
+      note: '',
+      ...overrides,
+    });
+
+    it('el cajero ve lo cobrado, cierra con lo contado y el siguiente cierre arranca en cero', async () => {
+      const { caja, cash, sinpe } = await cashierWithSales();
+      const service = caja.device.cashClosingService;
+
+      const pending = await service.getPending();
+      expect(pending).toMatchObject({ closable: true, suggestedOpeningFloat: 0, lastClosing: null });
+      expect(pending.sales.total).toBe(cash.totals.total + sinpe.totals.total);
+
+      // Esperado: fondo ₡10.000 + efectivo cobrado (el vuelto no cuenta).
+      const expected = 10_000 + cash.totals.total;
+      const closing = await service.close(closingInput(service, { countedCash: expected - 500, note: 'Falta una moneda' }));
+
+      expect(closing).toMatchObject({
+        number: 1,
+        closedBy: { id: caja.user.id },
+        sales: {
+          orderCount: 2,
+          total: cash.totals.total + sinpe.totals.total,
+          byMethod: {
+            cash: { count: 1, total: cash.totals.total },
+            card: { count: 0, total: 0 },
+            sinpe: { count: 1, total: sinpe.totals.total },
+          },
+        },
+        cash: { openingFloat: 10_000, cashSales: cash.totals.total, expected, counted: expected - 500, difference: -500 },
+        note: 'Falta una moneda',
+      });
+
+      const after = await service.getPending();
+      expect(after).toMatchObject({ closable: false, suggestedOpeningFloat: expected - 500, lastClosing: { number: 1 } });
+      expect(after.sales.orderCount).toBe(0);
+      expect((await service.listClosings()).map((item) => item.number)).toEqual([1]);
+    });
+
+    it('cada pedido entra en un solo cierre: los cobrados después van al siguiente', async () => {
+      const { caja } = await cashierWithSales();
+      const service = caja.device.cashClosingService;
+      await service.close(closingInput(service));
+
+      await caja.device.orderService.sendToKitchen(draftFor(caja.user), caja.user, PAYMENT);
+      const second = await service.close(closingInput(service, { openingFloat: 0, countedCash: 0 }));
+
+      expect(second).toMatchObject({ number: 2, sales: { orderCount: 1 } });
+      expect((await service.listClosings()).map((item) => item.number)).toEqual([2, 1]);
+    });
+
+    it('el servidor calcula los totales: lo que mande la tablet aparte de lo contado no cuenta', async () => {
+      const { caja, cash, sinpe } = await cashierWithSales();
+
+      const closing = await caja.device.cashClosingRepository.close({
+        ...closingInput(caja.device.cashClosingService),
+        sales: { total: 1 },
+        cash: { cashSales: 999_999, expected: 999_999 },
+      });
+
+      expect(closing.sales.total).toBe(cash.totals.total + sinpe.totals.total);
+      expect(closing.cash.cashSales).toBe(cash.totals.total);
+    });
+
+    it('reintentar el cierre con el mismo identificador no lo duplica', async () => {
+      const { caja } = await cashierWithSales();
+      const service = caja.device.cashClosingService;
+      const input = closingInput(service);
+
+      const first = await service.close(input);
+      const retry = await service.close(input);
+
+      expect(retry).toEqual(first);
+      expect(await service.listClosings()).toHaveLength(1);
+    });
+
+    it('con dos tablets cerrando a la vez, los pedidos quedan en un solo cierre', async () => {
+      const { caja } = await cashierWithSales();
+      const otra = await staffWithRole(ROLES.CASHIER, 'caja2');
+
+      const results = await Promise.allSettled([
+        caja.device.cashClosingService.close(closingInput(caja.device.cashClosingService)),
+        otra.device.cashClosingService.close(closingInput(otra.device.cashClosingService)),
+      ]);
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.find((result) => result.status === 'rejected').reason).toMatchObject({
+        code: CASH_CLOSING_ERROR.NO_SALES,
+      });
+      const closings = await caja.device.cashClosingService.listClosings();
+      expect(closings).toHaveLength(1);
+      expect(closings[0].sales.orderCount).toBe(2);
+    });
+
+    it('rechaza cerrar sin ventas y los montos inválidos, sin tocar los pedidos pendientes', async () => {
+      const empty = await staffWithRole(ROLES.CASHIER, 'caja0');
+      await expect(empty.device.cashClosingService.close(closingInput(empty.device.cashClosingService))).rejects.toMatchObject({
+        code: CASH_CLOSING_ERROR.NO_SALES,
+      });
+
+      const { caja } = await cashierWithSales();
+      const service = caja.device.cashClosingService;
+      for (const bad of [{ countedCash: -1 }, { countedCash: 10.5 }, { openingFloat: 'mucho' }, { countedCash: undefined }]) {
+        await expect(service.close(closingInput(service, bad))).rejects.toMatchObject({
+          code: CASH_CLOSING_ERROR.INVALID_AMOUNT,
+        });
+      }
+      await expect(service.close(closingInput(service, { id: 'con espacios' }))).rejects.toMatchObject({
+        code: CASH_CLOSING_ERROR.INVALID_ID,
+      });
+      expect((await service.getPending()).sales.orderCount).toBe(2);
+      expect(await service.listClosings()).toEqual([]);
+    });
+
+    it('un pedido cobrado y luego cancelado se informa aparte y no suma a las ventas', async () => {
+      const { caja, cash } = await cashierWithSales();
+      await caja.device.orderService.cancel(cash.id, caja.user);
+
+      const pending = await caja.device.cashClosingService.getPending();
+
+      expect(pending.sales.orderCount).toBe(1);
+      expect(pending.sales.cancelled).toEqual({ count: 1, total: cash.totals.total });
+      expect(pending.sales.byMethod.cash.total).toBe(0);
+    });
+
+    it('cocina y las cuentas sin rol no pueden ver ni cerrar la caja', async () => {
+      await cashierWithSales();
+      const cocina = await staffWithRole(ROLES.COOK, 'cocina1');
+      const sinRol = await registerStaff('sinrol');
+
+      for (const { device } of [cocina, sinRol]) {
+        const service = device.cashClosingService;
+        await expect(service.getPending()).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.listClosings()).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(service.close(closingInput(service))).rejects.toMatchObject({ code: 'forbidden' });
+      }
+      expect(await cashStore.listClosings()).toEqual([]);
+    });
+
+    it('el administrador también puede cerrar la caja y ve el historial', async () => {
+      await cashierWithSales();
+      const admin = await adminTablet();
+
+      const closing = await admin.device.cashClosingService.close(closingInput(admin.device.cashClosingService));
+
+      expect(closing).toMatchObject({ number: 1, closedBy: { id: admin.user.id } });
+      expect(await admin.device.cashClosingService.listClosings()).toHaveLength(1);
+    });
+
+    it('el servidor responde 409 al cerrar sin ventas', async () => {
+      const caja = await staffWithRole(ROLES.CASHIER, 'caja1');
+      const response = await fetch(`${baseUrl}/cash-closings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${caja.device.session.get()}` },
+        body: JSON.stringify({ id: 'cls_x', openingFloat: 0, countedCash: 0 }),
+      });
+
+      expect(response.status).toBe(409);
+      expect((await response.json()).error.code).toBe(CASH_CLOSING_ERROR.NO_SALES);
     });
   });
 });

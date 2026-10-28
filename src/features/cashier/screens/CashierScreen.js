@@ -15,6 +15,7 @@ import { styles } from '@/shared/styles/screens/cashier';
 import { Banner, Button, Chip, Spinner, Text } from '@/shared/ui';
 import { NotesSheet } from '../components/NotesSheet';
 import { OrderSummary } from '../components/OrderSummary';
+import { PaymentSheet } from '../components/PaymentSheet';
 import { ProductGrid } from '../components/ProductGrid';
 import { ProductOptionsSheet } from '../components/ProductOptionsSheet';
 import { ReadyOrdersSheet } from '../components/ReadyOrdersSheet';
@@ -25,7 +26,8 @@ const READY_ONLY = [ORDER_STATUS.READY];
 const NOTICE_MS = 6000;
 
 /**
- * Toma de pedidos: Categorías → Productos → Extras → Resumen → Enviar a cocina.
+ * Toma de pedidos: Categorías → Productos → Extras → Resumen → Cobro → Cocina.
+ * El pedido solo se envía a cocina cuando se confirma el pago.
  * Los pedidos que cocina deja listos aparecen en "Listos" para entregarlos.
  *
  * Al cerrar sesión la pantalla puede renderizarse un instante sin usuario
@@ -53,6 +55,8 @@ function CashierWorkspace({ user }) {
   const [notesItemId, setNotesItemId] = useState(null);
   const [readyOpen, setReadyOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
   const [deliveringId, setDeliveringId] = useState(null);
   const [notice, setNotice] = useState(null);
   const [lastSentOrder, setLastSentOrder] = useState(null);
@@ -85,21 +89,29 @@ function CashierWorkspace({ user }) {
     }
   }
 
-  async function send() {
+  function openPayment() {
+    setError(null);
+    setPaymentError(null);
+    setPaymentOpen(true);
+  }
+
+  async function send(payment) {
     if (sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
-    setError(null);
+    setPaymentError(null);
     setNotice(null);
     try {
-      const sent = await orderService.sendToKitchen(draft.order, user);
-      setNotice(`Pedido ${formatOrderNumber(sent.number)} de ${sent.customerName} enviado a cocina.`);
+      const sent = await orderService.sendToKitchen(draft.order, user, payment);
+      setPaymentOpen(false);
+      setNotice(`Pedido ${formatOrderNumber(sent.number)} de ${sent.customerName} cobrado y enviado a cocina.`);
       draft.reset();
       setLastSentOrder(sent);
       setReceiptOrder(sent);
     } catch (caught) {
-      // El borrador se conserva: se puede reintentar sin volver a armarlo.
-      setError(getErrorMessage(caught));
+      // El borrador se conserva y el cobro sigue abierto: se puede reintentar
+      // sin volver a armar el pedido ni a escribir el pago.
+      setPaymentError(getErrorMessage(caught));
     } finally {
       sendingRef.current = false;
       setSending(false);
@@ -131,7 +143,7 @@ function CashierWorkspace({ user }) {
       onRemove={draft.remove}
       onNoteChange={draft.setNote}
       onCustomerChange={draft.setCustomerName}
-      onSend={send}
+      onSend={openPayment}
     />
   );
 
@@ -159,6 +171,7 @@ function CashierWorkspace({ user }) {
       actions={
         <>
           {!wide ? <Button compact variant="secondary" icon="receipt-outline" label={`Ver pedido (${draft.order.totals.itemCount})`} onPress={() => workspaceScroll.current?.scrollTo({ y: summaryOffset.current, animated: true })} /> : null}
+          {can(user.role, PERMISSIONS.CASH_CLOSE) ? <Button compact variant="secondary" icon="wallet-outline" label="Cierre de caja" onPress={() => router.push('/caja/cierre')} /> : null}
           {lastSentOrder ? <Button compact variant="secondary" icon="print-outline" label={`Comprobante ${formatOrderNumber(lastSentOrder.number)}`} onPress={() => setReceiptOrder(lastSentOrder)} /> : null}
           <Button compact variant={ready.orders.length ? 'primary' : 'secondary'} icon="bag-check-outline" label={`Listos (${ready.orders.length})`} onPress={() => setReadyOpen(true)} />
         </>
@@ -223,6 +236,16 @@ function CashierWorkspace({ user }) {
             setNotesItemId(null);
           }}
           onClose={() => setNotesItemId(null)}
+        />
+      ) : null}
+
+      {paymentOpen ? (
+        <PaymentSheet
+          order={draft.order}
+          busy={sending}
+          error={paymentError}
+          onConfirm={send}
+          onClose={() => setPaymentOpen(false)}
         />
       ) : null}
 

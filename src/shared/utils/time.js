@@ -1,5 +1,8 @@
 const pad = (n) => String(n).padStart(2, '0');
 
+/** Zona horaria del restaurante: las fechas que ve el personal y los tickets van en esta hora. */
+export const RESTAURANT_TIME_ZONE = 'America/Costa_Rica';
+
 /**
  * Día de negocio como "YYYY-MM-DD". Con `timeZone` (p. ej. "America/Costa_Rica")
  * usa esa zona; sin ella, la zona del dispositivo. Define cuándo se reinicia
@@ -46,4 +49,23 @@ export function formatElapsed(ms) {
   return hours > 0
     ? `${hours}:${pad(minutes)}:${pad(seconds)}`
     : `${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
+ * Fecha y hora del restaurante: "12/10/2026, 6:05 p. m.".
+ * @param {string | Date} value fecha ISO o Date
+ * @param {string} [timeZone]
+ * @returns {string}
+ */
+export function formatDateTime(value, timeZone = RESTAURANT_TIME_ZONE) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat('es-CR', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
 }

@@ -13,10 +13,12 @@ import {
   sendOrderToKitchen,
   setCustomerName,
 } from '@/domain/orders';
+import { PAYMENT_METHOD } from '@/domain/payments';
 import { createMemoryStore } from './createMemoryStore';
 import { createPostgresStore } from './createPostgresStore';
 
 const [cashier, cook] = usersSeed;
+const PAYMENT = { method: PAYMENT_METHOD.CARD };
 
 const T0 = new Date('2026-10-12T18:00:00.000Z');
 const at = (minutes) => new Date(T0.getTime() + minutes * 60_000);
@@ -27,7 +29,7 @@ function sentOrder(number = 1, createdAt = T0) {
     createOrderItem({ product: findProduct(menuSeed, 'prod-papas'), quantity: 1 }),
     createdAt,
   );
-  return sendOrderToKitchen(draft, { number, user: cashier, now: new Date(createdAt.getTime() + 60_000) });
+  return sendOrderToKitchen(draft, { payment: PAYMENT, number, user: cashier, now: new Date(createdAt.getTime() + 60_000) });
 }
 
 /** PGlite = Postgres real compilado a WebAssembly; adaptado a la forma de `db`. */

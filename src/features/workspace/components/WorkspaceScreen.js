@@ -13,6 +13,7 @@ const NAVIGATION = [
   { key: 'menu', label: 'Menú', icon: 'restaurant-outline', route: '/admin/menu', area: AREAS.ADMIN },
   { key: 'users', label: 'Equipo', icon: 'people-outline', route: '/admin/usuarios', area: AREAS.ADMIN },
   { key: 'cashier', label: 'Caja', icon: 'receipt-outline', route: '/caja', area: AREAS.CASHIER },
+  { key: 'closing', label: 'Cierre', icon: 'wallet-outline', route: '/caja/cierre', area: AREAS.CASHIER },
   { key: 'kitchen', label: 'Cocina', icon: 'flame-outline', route: '/cocina', area: AREAS.KITCHEN },
 ];
 

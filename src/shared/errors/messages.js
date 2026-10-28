@@ -47,6 +47,18 @@ const MESSAGES = {
   print_failed: 'No se pudo abrir la impresión. En la pestaña del comprobante usa el menú de Chrome → Compartir → Imprimir, o intenta de nuevo desde aquí.',
   print_unsupported: 'Abre el sistema en Chrome en tu tablet para imprimir el comprobante.',
 
+  // Cobro
+  payment_required: 'Confirma el pago del cliente para poder enviar el pedido a cocina.',
+  payment_insufficient: 'El efectivo que entregó el cliente no alcanza para cubrir el total.',
+  payment_invalid_amount: 'Escribe con cuánto paga el cliente (solo números, sin decimales).',
+  payment_invalid_method: 'Elige cómo paga el cliente: efectivo, tarjeta o SINPE Móvil.',
+
+  // Cierre de caja
+  cash_no_sales: 'No hay pedidos cobrados por cerrar desde el último cierre.',
+  cash_invalid_amount: 'El fondo inicial y el efectivo contado deben ser montos enteros en colones.',
+  cash_invalid_note: 'La observación puede tener hasta 200 caracteres.',
+  cash_invalid_id: 'No se pudo identificar el cierre. Intenta de nuevo.',
+
   // Pedidos
   empty_order: 'Agrega al menos un producto antes de enviar.',
   customer_name_required: 'Escribe el nombre del cliente para poder enviar el pedido.',

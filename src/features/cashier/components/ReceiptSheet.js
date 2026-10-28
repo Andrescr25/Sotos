@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { formatOrderNumber } from '@/domain/orders';
 import { OrderItemsList } from '@/features/orders/components/OrderItemsList';
+import { PaymentSummary } from '@/features/orders/components/PaymentSummary';
 import { receiptService } from '@/services/receiptService';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { styles } from '@/shared/styles/components/receipt';
@@ -38,12 +39,13 @@ export function ReceiptSheet({ order, onClose }) {
         <Button variant="secondary" label="Seguir tomando pedidos" onPress={onClose} />
       </View>
     }>
-      <Banner tone="success" message="El pedido ya fue enviado a cocina. Puedes imprimir su comprobante o seguir atendiendo." />
+      <Banner tone="success" message={order.payment ? 'El pago quedó registrado y el pedido ya fue enviado a cocina. Puedes imprimir su comprobante o seguir atendiendo.' : 'El pedido ya fue enviado a cocina. Puedes imprimir su comprobante o seguir atendiendo.'} />
       <View style={styles.confirmation}>
         <View style={styles.identity}><Text variant="title">{order.customerName}</Text><Text color="success">{formatOrderNumber(order.number)}</Text></View>
         <OrderItemsList items={order.items} />
         <View style={styles.total}><Text variant="title">Total</Text><Text variant="title">{formatColones(order.totals.total)}</Text></View>
       </View>
+      <PaymentSummary order={order} />
       <View style={styles.group}>
         <Text color="textSecondary">Ancho del papel</Text>
         <View style={styles.chips}>

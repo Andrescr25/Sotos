@@ -14,6 +14,8 @@ export const PERMISSIONS = Object.freeze({
   ORDER_DELIVER: 'order:deliver',
   ORDER_CANCEL: 'order:cancel',
   KITCHEN_VIEW: 'kitchen:view',
+  /** Ver el cuadre de la caja, cerrarla y consultar los cierres anteriores. */
+  CASH_CLOSE: 'cash:close',
   /** Leer el menú (caja lo necesita para tomar pedidos). */
   MENU_VIEW: 'menu:view',
   /** Agregar, editar y eliminar platillos, bebidas, extras y categorías. */
@@ -30,6 +32,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.ORDER_SEND,
     PERMISSIONS.ORDER_DELIVER,
     PERMISSIONS.ORDER_CANCEL,
+    PERMISSIONS.CASH_CLOSE,
   ],
   [ROLES.COOK]: [
     PERMISSIONS.ORDER_VIEW,

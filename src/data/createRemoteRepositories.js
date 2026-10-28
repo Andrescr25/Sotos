@@ -1,6 +1,7 @@
 import { createHttpClient } from './remote/createHttpClient';
 import { createRealtimeClient } from './remote/createRealtimeClient';
 import { createRemoteAccountRepositories } from './remote/createRemoteAccountRepositories';
+import { createRemoteCashClosingRepository } from './remote/createRemoteCashClosingRepository';
 import { createRemoteMenuRepository } from './remote/createRemoteMenuRepository';
 import { createRemoteOrderRepository } from './remote/createRemoteOrderRepository';
 import { createSessionStore } from './session/createSessionStore';
@@ -18,6 +19,7 @@ export function createRemoteRepositories(apiUrl) {
 
   return {
     orderRepository: createRemoteOrderRepository({ http, realtime }),
+    cashClosingRepository: createRemoteCashClosingRepository({ http }),
     menuRepository: createRemoteMenuRepository({ http, realtime }),
     authRepository: accounts.authRepository,
     userRepository: accounts.userRepository,

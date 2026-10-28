@@ -53,6 +53,17 @@ Arquitectura completa en `docs/ARQUITECTURA.md`; despliegue en `docs/DESPLIEGUE_
 - Al cambiar una contraseña se cierran las conexiones en vivo de la cuenta (`hub.disconnectUser`); el cliente solo expira su sesión si el token rechazado es el vigente (`createRealtimeClient`).
 - `users.password_hash` es NULL-able: cualquier consulta debe tratarlo como "cuenta invitada".
 
+## Cobro antes de cocina y cierre de caja
+
+- **Un pedido no sale a cocina sin pago.** `Order.payment` (forma, monto, recibido, vuelto, `paidAt`, `receivedBy`) es obligatorio para pasar de borrador a "nuevo". Se exige en tres capas, igual que el nombre: `changeOrderStatus` (dominio), `checkOrderWrite` + `checkOrderActor` (servidor y memoria; el pago debe estar firmado por la sesión) y el modal de cobro de Caja.
+- El pago se arma dentro de `sendOrderToKitchen(order, { payment: { method, tendered } })` con el total **de ese instante**; nunca se guarda en el borrador. Es inmutable tras el envío. Los pedidos viejos sin `payment` siguen siendo válidos: comparar con `payment ?? null`, no exigirlo en actualizaciones.
+- Toda prueba que arme un pedido para enviar debe pasar `payment` (p. ej. `{ method: PAYMENT_METHOD.CARD }`, que no pide monto).
+- Formas de pago: `PAYMENT_METHOD` (`cash`/`card`/`sinpe`, en `@/domain/payments`). Solo el efectivo lleva monto recibido y vuelto. **El vuelto no es venta**: las ventas suman `payment.amount`.
+- **Cierre de caja** (`@/domain/cashClosing`, permiso `CASH_CLOSE` para cajero y admin): cubre los pedidos con pago que ningún cierre ha cubierto. **El servidor lo calcula todo** (`createCashClosing`); la tablet solo manda `id`, fondo inicial, efectivo contado y nota. Servidor y modo en memoria comparten esa función pura: una regla nueva va en el dominio, nunca solo en una capa.
+- Las tablas `cash_closings` y `cash_closing_orders` pasan por `lockDown`. La clave primaria de `cash_closing_orders` (id del pedido) y el bloqueo consultivo del cierre garantizan que un pedido entre en un solo cierre. No agregar clave foránea hacia `orders`.
+- Un pedido cobrado y luego cancelado **no suma a las ventas** del cierre; se informa aparte. Repetir un cierre con el mismo `id` devuelve el ya guardado (idempotente, como `sendToKitchen`).
+- Despliegue: publicar primero el servidor (crea las tablas solo, al arrancar) y después la app; las tablets con la versión anterior no podrán enviar pedidos (falta el pago) hasta que recarguen.
+
 ## Nombre del cliente en cada pedido
 
 - `Order.customerName` es **obligatorio** para enviar a cocina (`isValidCustomerName`: ≥ 2 caracteres y alguna letra). Se exige en tres capas: `changeOrderStatus` (dominio), `checkOrderWrite` (servidor y memoria) y el botón de Caja. Es inmutable tras el envío.

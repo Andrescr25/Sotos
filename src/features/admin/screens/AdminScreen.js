@@ -45,6 +45,7 @@ export default function AdminScreen() {
         <View style={styles.actions}>
           <ActionCard title="Abrir Caja" description="Toma pedidos, personaliza cada orden y coordina las entregas." icon="receipt-outline" onPress={() => router.push('/caja')} />
           <ActionCard title="Abrir Cocina" description="Consulta los pedidos y acompaña cada preparación hasta que esté lista." icon="flame-outline" onPress={() => router.push('/cocina')} />
+          <ActionCard title="Cierre de caja" description="Revisa lo cobrado por forma de pago, cuadra el efectivo y consulta los cierres anteriores." icon="wallet-outline" onPress={() => router.push('/caja/cierre')} />
         </View>
       </View>
     </WorkspaceScreen>

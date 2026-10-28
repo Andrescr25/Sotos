@@ -24,6 +24,7 @@ export function receiptStyles(paperWidth) {
     .amount span:first-child { min-width: 0; }
     .amount span:last-child, .total strong { white-space: nowrap; flex-shrink: 0; }
     .detail { padding-left: ${spacing.sm}px; }
+    .payment { padding-top: ${spacing.sm}px; }
     .note { white-space: pre-wrap; margin-top: ${spacing.sm}px; }
     .total { border-top: 1px dashed; padding-top: ${spacing.md}px; margin-top: ${spacing.sm}px; font-size: ${printing.totalFontSize}px; font-weight: bold; }
     footer { border-top: 1px dashed; margin-top: ${spacing.md}px; padding-top: ${spacing.md}px; }

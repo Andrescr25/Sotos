@@ -72,6 +72,18 @@
  * @property {(listener: (event: { type: 'users:changed' } | ConnectionEvent) => void) => () => void} subscribe
  *   Avisa de altas y cambios de cuentas para refrescar la lista.
  *
+ * ── Cierre de caja ───────────────────────────────────────────────────────
+ *
+ * @typedef {Object} CashClosingRepository
+ * @property {() => Promise<import('@/domain/cashClosing').CashPending>} getPending
+ *   Lo cobrado desde el último cierre. Solo quien puede cerrar la caja.
+ * @property {(input: { id: string, openingFloat: number, countedCash: number, note?: string }) => Promise<import('@/domain/cashClosing').CashClosing>} close
+ *   Cierra la caja con lo contado. Cada pedido cobrado entra en un solo cierre;
+ *   repetir el mismo `id` devuelve el cierre ya guardado. Lanza error con
+ *   `code` `cash_no_sales`, `cash_invalid_amount`...
+ * @property {(options?: { limit?: number }) => Promise<import('@/domain/cashClosing').CashClosing[]>} list
+ *   Del más reciente al más antiguo.
+ *
  * ── Menú ─────────────────────────────────────────────────────────────────
  *
  * @typedef {'categories' | 'products' | 'extras'} MenuCollection

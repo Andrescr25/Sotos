@@ -6,6 +6,8 @@ export const ORDER_ERROR = Object.freeze({
   EMPTY_ORDER: 'empty_order',
   /** La cuenta que sale de Caja debe llevar el nombre del cliente. */
   CUSTOMER_NAME_REQUIRED: 'customer_name_required',
+  /** El pedido no sale a cocina hasta que el pago esté confirmado y cuadre con el total. */
+  PAYMENT_REQUIRED: 'payment_required',
   NOT_EDITABLE: 'not_editable',
   ORDER_NOT_FOUND: 'order_not_found',
   ITEM_NOT_FOUND: 'item_not_found',
