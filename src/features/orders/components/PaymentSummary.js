@@ -1,8 +1,8 @@
 import { View } from 'react-native';
 import { PAYMENT_METHOD, PAYMENT_METHOD_LABELS } from '@/domain/payments';
-import { styles } from '@/shared/styles/components/payment';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { formatColones } from '@/shared/utils/money';
-import { Text } from '@/shared/ui';
+import { DataRow } from '@/shared/ui';
 
 /**
  * Cómo se pagó un pedido: la forma de pago y, en efectivo, lo recibido y el
@@ -14,24 +14,14 @@ import { Text } from '@/shared/ui';
 export function PaymentSummary({ order }) {
   const { payment } = order;
   if (!payment) return null;
-  const cash = payment.method === PAYMENT_METHOD.CASH;
 
   return (
-    <View style={styles.summary}>
-      <View style={styles.summaryRow}>
-        <Text color="textSecondary">Pagó con</Text>
-        <Text variant="label">{PAYMENT_METHOD_LABELS[payment.method]}</Text>
-      </View>
-      {cash ? (
+    <View style={commonStyles.panel}>
+      <DataRow label="Pagó con" value={PAYMENT_METHOD_LABELS[payment.method]} />
+      {payment.method === PAYMENT_METHOD.CASH ? (
         <>
-          <View style={styles.summaryRow}>
-            <Text color="textSecondary">Recibido</Text>
-            <Text variant="label">{formatColones(payment.tendered)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text variant="title">Vuelto</Text>
-            <Text variant="title" color="success">{formatColones(payment.change)}</Text>
-          </View>
+          <DataRow label="Recibido" value={formatColones(payment.tendered)} />
+          <DataRow strong label="Vuelto" value={formatColones(payment.change)} tone="success" />
         </>
       ) : null}
     </View>

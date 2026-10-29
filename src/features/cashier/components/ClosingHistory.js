@@ -1,8 +1,8 @@
 import { View } from 'react-native';
-import { styles } from '@/shared/styles/screens/cashClosing';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { formatColones } from '@/shared/utils/money';
 import { formatDateTime } from '@/shared/utils/time';
-import { Text } from '@/shared/ui';
+import { ListRow, Text } from '@/shared/ui';
 import { describeDifference } from '../cashDifference';
 
 /**
@@ -13,7 +13,7 @@ import { describeDifference } from '../cashDifference';
  */
 export function ClosingHistory({ closings }) {
   return (
-    <View style={styles.history}>
+    <View style={commonStyles.section}>
       <Text variant="title">Cierres anteriores</Text>
       {closings.length === 0 ? (
         <Text color="textSecondary">Aún no se ha cerrado la caja.</Text>
@@ -21,22 +21,15 @@ export function ClosingHistory({ closings }) {
         closings.map((closing) => {
           const difference = describeDifference(closing.cash.difference);
           return (
-            <View key={closing.id} style={styles.historyRow}>
-              <View style={styles.row}>
-                <View style={styles.historyIdentity}>
-                  <Text variant="bodyLarge">{`Cierre #${closing.number}`}</Text>
-                  <Text variant="caption" color="textSecondary">{`${formatDateTime(closing.closedAt)} · ${closing.closedBy.name}`}</Text>
-                </View>
-                <Text variant="title" color="primary">{formatColones(closing.sales.total)}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text color="textSecondary">{`Efectivo contado ${formatColones(closing.cash.counted)}`}</Text>
-                <Text variant="label" color={difference.color}>
-                  {difference.kind === 'exact' ? 'Cuadró' : `${difference.caption}: ${difference.label}`}
-                </Text>
-              </View>
-              {closing.note ? <Text variant="caption" color="textSecondary">{closing.note}</Text> : null}
-            </View>
+            <ListRow
+              key={closing.id}
+              icon="wallet-outline"
+              title={`Cierre #${closing.number}`}
+              subtitle={[`${formatDateTime(closing.closedAt)} · ${closing.closedBy.name}`, closing.note].filter(Boolean).join(' · ')}
+              value={formatColones(closing.sales.total)}
+              detail={`Efectivo contado ${formatColones(closing.cash.counted)} · ${difference.kind === 'exact' ? 'Cuadró' : `${difference.caption}: ${difference.label}`}`}
+              detailColor={difference.color}
+            />
           );
         })
       )}

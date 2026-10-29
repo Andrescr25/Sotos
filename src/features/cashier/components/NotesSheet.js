@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
-import { commonStyles as styles } from '@/shared/styles/commonStyles';
-import { Button, Chip, Sheet, TextField } from '@/shared/ui';
+import { ChipField, Sheet, TextField } from '@/shared/ui';
 
 /**
  * Editar las observaciones de una línea ya agregada.
@@ -29,13 +27,9 @@ export function NotesSheet({ item, quickNotes, onSave, onClose }) {
       visible
       title={`Observaciones · ${item.name}`}
       onClose={onClose}
-      footer={<Button icon="checkmark" label="Guardar" onPress={() => onSave([...selected, custom])} />}
+      primaryAction={{ icon: 'checkmark', label: 'Guardar', onPress: () => onSave([...selected, custom]) }}
     >
-      <View style={styles.chips}>
-        {options.map((note) => (
-          <Chip key={note} label={note} selected={selected.includes(note)} onPress={() => toggle(note)} />
-        ))}
-      </View>
+      <ChipField options={options.map((note) => ({ key: note, label: note }))} isSelected={(note) => selected.includes(note)} onSelect={toggle} />
       <TextField
         placeholder="Otra observación"
         value={custom}

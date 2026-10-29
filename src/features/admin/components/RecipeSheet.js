@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { PORTIONS_PER_UNIT_MAX, formatPortions } from '@/domain/inventory';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { styles } from '@/shared/styles/components/inventory';
-import { Banner, Button, Sheet, Stepper, Text } from '@/shared/ui';
+import { Banner, Sheet, Stepper, Text } from '@/shared/ui';
 
 /**
  * Receta de un platillo, bebida o extra: cuántas porciones de cada insumo
@@ -36,7 +36,7 @@ export function RecipeSheet({ title, items, lines, busy, error, onSave, onClose 
       testID="recipe-form"
       title={`Receta: ${title}`}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar receta'} onPress={save} disabled={busy} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar receta', onPress: save, disabled: busy }}
     >
       {error ? <Banner tone="error" message={getErrorMessage(error)} /> : null}
       <Text color="textSecondary">

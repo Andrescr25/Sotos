@@ -1,8 +1,6 @@
-import { Pressable, View } from 'react-native';
 import { STOCK_STATUS, describeStock, getStockStatus } from '@/domain/inventory';
-import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/components/inventory';
-import { Button, Icon, Text } from '@/shared/ui';
+import { Button, IconButton, ListRow, Text } from '@/shared/ui';
 
 const STATUS = {
   [STOCK_STATUS.OK]: { color: 'textPrimary', label: null },
@@ -26,27 +24,20 @@ export function InventoryItemRow({ item, busy, onAdjust, onEdit }) {
     item.portionsPerUnit === 1 ? `Se cuenta por ${item.unit}` : `${item.portionsPerUnit} porciones por ${item.unit}`;
 
   return (
-    <View style={styles.row}>
-      <View style={styles.identity}>
-        <View style={commonStyles.iconWell}><Icon name="cube-outline" color="primary" /></View>
-        <View style={styles.info}>
-          <Text variant="bodyLarge" style={styles.title}>{item.name}</Text>
-          <Text variant="caption" color="textSecondary">{perUnit}</Text>
-        </View>
-      </View>
-
-      <View style={styles.stock}>
-        <Text color={status.color} style={styles.stockValue}>{describeStock(item)}</Text>
-        <Text variant="caption" color="textSecondary">{`${item.stock} ${Math.abs(item.stock) === 1 ? 'porción' : 'porciones'}`}</Text>
-        {status.label ? <Text variant="caption" color={status.color}>{status.label}</Text> : null}
-      </View>
-
-      <View style={styles.controls}>
-        <Button compact variant="secondary" icon="swap-vertical-outline" label="Ajustar stock" accessibilityLabel={`Ajustar stock de ${item.name}`} onPress={onAdjust} disabled={busy} />
-        <Pressable accessibilityRole="button" accessibilityLabel={`Editar ${item.name}`} accessibilityState={{ disabled: busy }} disabled={busy} onPress={onEdit} style={commonStyles.iconButton}>
-          <Icon name="create-outline" size="sm" color="primary" />
-        </Pressable>
-      </View>
-    </View>
+    <ListRow
+      icon="cube-outline"
+      title={item.name}
+      subtitle={perUnit}
+      aside={
+        <>
+          <Text color={status.color} style={styles.stockValue}>{describeStock(item)}</Text>
+          <Text variant="caption" color="textSecondary">{`${item.stock} ${Math.abs(item.stock) === 1 ? 'porción' : 'porciones'}`}</Text>
+          {status.label ? <Text variant="caption" color={status.color}>{status.label}</Text> : null}
+        </>
+      }
+    >
+      <Button compact variant="secondary" icon="swap-vertical-outline" label="Ajustar stock" accessibilityLabel={`Ajustar stock de ${item.name}`} onPress={onAdjust} disabled={busy} />
+      <IconButton icon="create-outline" label={`Editar ${item.name}`} color="primary" disabled={busy} onPress={onEdit} />
+    </ListRow>
   );
 }

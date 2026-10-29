@@ -18,22 +18,66 @@ shared/styles/
 
 Los componentes importan sus estilos desde esta carpeta. Para repetir un patrón,
 combina `commonStyles` con los estilos propios o crea un componente en `shared/ui`.
-Los formularios usan `components/forms.js`; las pantallas internas comparten
-`features/workspace/components/WorkspaceScreen`, que también filtra la navegación
-con los permisos del usuario.
+Las pantallas internas comparten `features/workspace/components/WorkspaceScreen`,
+que también filtra la navegación con los permisos del usuario.
 
-`useResponsiveLayout` calcula el espacio útil y considera el tamaño del texto.
-La navegación lateral aparece a partir de 1180 px; en tamaños menores se convierte
-en una barra horizontal. Caja coloca el resumen al lado cuando hay al menos
-960 px útiles, y Cocina usa tres columnas desde 1000 px útiles. Debajo, ambas
-vistas se apilan con un único desplazamiento vertical. Los valores se definen en
-`shared/theme/layout.js`; las tarjetas del catálogo calculan sus columnas con el
-ancho real de su contenedor.
+## Componentes compartidos de diseño (`shared/ui`)
 
-Mantén `minWidth: 0` y permite que las filas y etiquetas se ajusten cuando el
-contenido crezca. Usa el componente `Sheet` para formularios: comparte área
-segura, desplazamiento, cierre y pie de acciones. Los controles tienen un área
-táctil mínima de 48 px y los botones principales de 56 px.
+Antes de escribir un estilo nuevo, busca aquí: cada pieza ya se adapta sola al
+tamaño de la pantalla. Un cambio de diseño se hace **una vez**, en el componente.
+
+| Necesito… | Uso |
+|---|---|
+| Una fila de lista con icono, datos, cifra y controles (menú, inventario, cierres) | `ListRow` |
+| Dato a la izquierda y valor a la derecha (resúmenes, cuadres, totales) | `DataRow` |
+| Cifra destacada con su explicación (total, vuelto, "falta", si cuadra) | `Callout` |
+| Botón cuadrado solo con icono (editar, quitar, cerrar, salir) | `IconButton` |
+| Pestañas de una pantalla | `Tabs` |
+| Filtros o categorías en chips | `ChipRow` |
+| Explicación + botón sobre una lista | `Toolbar` |
+| Dos paneles lado a lado que se apilan si no caben | `Columns` + `Column` |
+| Estado vacío (con o sin tarjeta) | `EmptyState` |
+| Un modal con pie de acciones | `Sheet` con `primaryAction` y `secondaryAction` |
+| Aviso en línea (error, éxito, información) | `Banner` |
+
+## Cómo se adapta el diseño
+
+`useResponsiveLayout` calcula el espacio útil considerando el tamaño del texto
+(`computeLayout` es la misma lógica como función pura, con pruebas) y devuelve:
+
+| Bandera | Cuándo | Qué cambia |
+|---|---|---|
+| `mobile` | ancho < 600 px | teléfono: márgenes menores, título más chico |
+| `short` | alto < 640 px | teléfono horizontal, ventana pequeña, teclado abierto |
+| `compact` | `mobile` **o** `short` | falta altura: se cede espacio al contenido |
+| `sidebar` | ancho ≥ 1180 px | navegación lateral (si no, barra horizontal) |
+| `split` | ≥ 960 px útiles | dos columnas (Caja, Cierre de caja) |
+| `board` | ≥ 1000 px útiles | tres columnas (Cocina) |
+
+Con `compact`: la cabecera de página viaja **dentro** del desplazamiento (si la
+pantalla usa `scroll`) en vez de quedarse fija y quitar la mitad de la pantalla,
+"Volver" pasa a ser un icono junto al título, las pestañas y filtros forman una
+tira que se desliza de lado, los pies de los modales van lado a lado, y los
+avisos destacados (`Callout`) se acomodan en una fila. Con `short` además se
+omiten la explicación bajo el título y el pie decorativo de la barra lateral.
+Los valores están en `shared/theme/layout.js`.
+
+## Reglas para una pantalla nueva
+
+- Usa `WorkspaceScreen`. Si la página es una lista o un formulario, pasa `scroll`:
+  **no pongas tu propio `ScrollView`** (el marco desplaza también la cabecera en
+  pantallas compactas). Si tiene paneles con desplazamiento propio (Caja, Cocina
+  en pantallas anchas), pasa `scroll={false}` y usa `Columns` con `fill`.
+- Los avisos (`Banner`) y bloques que pongas como hijos ya quedan separados por el
+  marco: no les des `margin`.
+- Mantén `minWidth: 0` y permite que las filas y etiquetas se ajusten cuando el
+  contenido crezca.
+- Para formularios usa `Sheet`: comparte área segura, desplazamiento, cierre y pie
+  de acciones. Los controles tienen un área táctil mínima de 48 px y los botones
+  principales de 56 px.
+- Los estilos de grupos, chips, filas y tarjetas salen de `commonStyles`
+  (`group`, `chips`, `rowBetween`, `card`, `panel`, `section`); no los reexportes
+  ni los copies a otro archivo de estilos.
 
 El CSS global se carga solo en web desde la raíz de Expo Router; las variables
 `--sotos-*` vienen de `theme.colors`. Los estilos de pantalla y componentes usan

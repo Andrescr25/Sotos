@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from '@/domain/users';
 import { useAuth } from '@/features/auth';
 import { getErrorMessage } from '@/shared/errors/messages';
@@ -49,22 +49,21 @@ export default function UsersScreen() {
   }
 
   return (
-    <WorkspaceScreen section="users" title="Usuarios y accesos" subtitle="Un buen equipo empieza con las personas." back actions={<Button compact icon="person-add-outline" label="Invitar empleado" onPress={() => setInviting(true)} />}>
+    <WorkspaceScreen section="users" title="Usuarios y accesos" subtitle="Un buen equipo empieza con las personas." back scroll actions={<Button compact icon="person-add-outline" label="Invitar empleado" onPress={() => setInviting(true)} />}>
       {pendingCount > 0 ? (
         <Banner
           tone="warning"
           message={`${pendingCount} ${pendingCount === 1 ? 'cuenta espera' : 'cuentas esperan'} que le asignes un acceso.`}
-          style={styles.banner}
         />
       ) : null}
       {error ? (
-        <Banner tone="error" message={getErrorMessage(error)} style={styles.banner} onDismiss={reload} />
+        <Banner tone="error" message={getErrorMessage(error)} onDismiss={reload} />
       ) : null}
 
       {loading ? (
         <Spinner message="Cargando usuarios…" />
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <>
           {users.map((account) => {
             const isMe = account.id === me?.id;
             const pending = account.active && !account.role;
@@ -146,7 +145,7 @@ export default function UsersScreen() {
               </View>
             );
           })}
-        </ScrollView>
+        </>
       )}
 
       {inviting ? (

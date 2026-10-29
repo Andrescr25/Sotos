@@ -7,6 +7,15 @@ import { theme } from '@/shared/theme';
  * Si un patrón visual aparece en dos pantallas, va aquí o en un componente de
  * shared/ui, no se copia.
  */
+const card = {
+  backgroundColor: theme.colors.surface,
+  borderRadius: theme.radius.lg,
+  padding: theme.spacing.lg,
+  borderWidth: 1,
+  borderColor: theme.colors.border,
+  ...theme.shadows.card,
+};
+
 export const commonStyles = StyleSheet.create({
   fill: { flex: 1 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: theme.spacing.sm },
@@ -18,19 +27,16 @@ export const commonStyles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
-  },
+  card,
+  /** Tarjeta con sus bloques separados: el contenedor de casi todo resumen o formulario. */
+  panel: { ...card, gap: theme.spacing.lg },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: theme.colors.border,
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
+  /** Botones de acción centrados que pasan a otra línea si no caben (estados vacíos). */
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: theme.spacing.sm, width: '100%' },
   group: { gap: theme.spacing.sm },
   section: { gap: theme.spacing.lg },
   list: { gap: theme.spacing.lg, paddingBottom: theme.spacing.xl },
@@ -49,6 +55,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'center', justifyContent: 'center',
   },
+  iconButtonPressed: { backgroundColor: theme.colors.border },
   empty: {
     minHeight: theme.layout.emptyMinHeight, padding: theme.spacing.xl,
     alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md,

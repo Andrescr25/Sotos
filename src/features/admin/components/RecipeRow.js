@@ -1,8 +1,5 @@
-import { View } from 'react-native';
 import { formatPortions } from '@/domain/inventory';
-import { commonStyles } from '@/shared/styles/commonStyles';
-import { styles } from '@/shared/styles/components/inventory';
-import { Button, Icon, Text } from '@/shared/ui';
+import { Button, ListRow } from '@/shared/ui';
 
 /**
  * Un producto o extra con un resumen de lo que gasta del inventario.
@@ -26,18 +23,14 @@ export function RecipeRow({ title, subtitle, icon = 'restaurant-outline', lines,
     .join(' · ');
 
   return (
-    <View style={styles.row}>
-      <View style={styles.identity}>
-        <View style={commonStyles.iconWell}><Icon name={icon} color="primary" /></View>
-        <View style={styles.info}>
-          <Text variant="bodyLarge" style={styles.title}>{title}</Text>
-          {subtitle ? <Text variant="caption" color="textSecondary">{subtitle}</Text> : null}
-          <Text variant="caption" color={summary ? 'primary' : 'textSecondary'}>
-            {summary || 'Sin receta: no descuenta inventario'}
-          </Text>
-        </View>
-      </View>
+    <ListRow
+      icon={icon}
+      title={title}
+      subtitle={subtitle}
+      detail={summary || 'Sin receta: no descuenta inventario'}
+      detailColor={summary ? 'primary' : 'textSecondary'}
+    >
       <Button compact variant="secondary" icon="create-outline" label={summary ? 'Editar receta' : 'Agregar receta'} accessibilityLabel={`${summary ? 'Editar' : 'Agregar'} receta de ${title}`} onPress={onEdit} disabled={busy} />
-    </View>
+    </ListRow>
   );
 }

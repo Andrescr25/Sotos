@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
 import { calculateCashDifference, calculateExpectedCash } from '@/domain/cashClosing';
 import { PAYMENT_METHOD } from '@/domain/payments';
 import { useAuth } from '@/features/auth';
@@ -8,10 +7,9 @@ import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen
 import { cashClosingService } from '@/services';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
-import { styles } from '@/shared/styles/screens/cashClosing';
 import { formatColones, parseColones } from '@/shared/utils/money';
 import { formatDateTime } from '@/shared/utils/time';
-import { Banner, EmptyState, Spinner } from '@/shared/ui';
+import { Banner, Column, Columns, EmptyState, Spinner } from '@/shared/ui';
 import { describeDifference } from '../cashDifference';
 import { CashCountCard } from '../components/CashCountCard';
 import { ClosingHistory } from '../components/ClosingHistory';
@@ -112,22 +110,21 @@ function CashClosingWorkspace() {
         <Banner
           tone="success"
           message={`Caja cerrada. Cierre #${closed.number}: ${formatColones(closed.sales.total)} en ventas, ${closedSummary.kind === 'exact' ? 'el efectivo cuadró' : `${closedSummary.caption.toLowerCase()} ${closedSummary.label}`}.`}
-          style={styles.banner}
           onDismiss={() => setClosed(null)}
         />
       ) : null}
-      {loadError ? <Banner tone="error" message={getErrorMessage(loadError)} style={styles.banner} /> : null}
+      {loadError ? <Banner tone="error" message={getErrorMessage(loadError)} /> : null}
 
       {loading ? (
         <Spinner message="Calculando la caja…" />
       ) : pending ? (
-        <View style={styles.page}>
+        <>
           {pending.closable ? (
-            <View style={wide ? styles.columns : styles.columnsNarrow}>
-              <View style={styles.column}>
+            <Columns wide={wide}>
+              <Column>
                 <SalesBreakdown sales={pending.sales} since={pending.since} />
-              </View>
-              <View style={styles.column}>
+              </Column>
+              <Column>
                 <CashCountCard
                   cashSales={cashSales}
                   openingText={effectiveOpening}
@@ -144,10 +141,11 @@ function CashClosingWorkspace() {
                     setConfirmOpen(true);
                   }}
                 />
-              </View>
-            </View>
+              </Column>
+            </Columns>
           ) : (
             <EmptyState
+              card
               icon="wallet-outline"
               title="No hay ventas por cerrar"
               message={
@@ -159,7 +157,7 @@ function CashClosingWorkspace() {
           )}
 
           <ClosingHistory closings={closings} />
-        </View>
+        </>
       ) : null}
 
       {confirmOpen && ready ? (

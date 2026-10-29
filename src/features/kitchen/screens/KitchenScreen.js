@@ -100,13 +100,13 @@ export default function KitchenScreen() {
   );
 
   return (
-    <WorkspaceScreen section="kitchen" title="Cocina" subtitle="Todo a su tiempo. Todo en su punto.">
+    <WorkspaceScreen section="kitchen" title="Cocina" subtitle="Todo a su tiempo. Todo en su punto." scroll={!wide}>
       {!connected ? (
-        <Banner tone="warning" message="Sin conexión con el servidor. Reconectando… los pedidos nuevos no llegarán hasta que vuelva." style={styles.banner} />
+        <Banner tone="warning" message="Sin conexión con el servidor. Reconectando… los pedidos nuevos no llegarán hasta que vuelva." />
       ) : null}
-      {error ? <Banner tone="error" message={getErrorMessage(error)} style={styles.banner} onDismiss={reload} /> : null}
+      {error ? <Banner tone="error" message={getErrorMessage(error)} onDismiss={reload} /> : null}
       {actionError ? (
-        <Banner tone="error" message={actionError} style={styles.banner} onDismiss={() => setActionError(null)} />
+        <Banner tone="error" message={actionError} onDismiss={() => setActionError(null)} />
       ) : null}
 
       {loading ? (
@@ -120,7 +120,7 @@ export default function KitchenScreen() {
           ))}
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.columnContent}>{grouped.map(renderColumn)}</ScrollView>
+        grouped.map(renderColumn)
       )}
     </WorkspaceScreen>
   );

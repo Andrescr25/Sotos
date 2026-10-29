@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { View } from 'react-native';
 import { PRODUCT_KIND, PRODUCT_KIND_LABELS } from '@/domain/menu';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { commonStyles as styles } from '@/shared/styles/commonStyles';
 import { parseColones } from '@/shared/utils/money';
-import { Banner, Button, Chip, Sheet, Text, TextField, Toggle } from '@/shared/ui';
+import { Banner, ChipField, Sheet, TextField, Toggle } from '@/shared/ui';
+
 import { DeleteSection } from './DeleteSection';
+
+const KIND_OPTIONS = Object.values(PRODUCT_KIND).map((value) => ({ key: value, label: PRODUCT_KIND_LABELS[value] }));
 
 /**
  * Crear o editar un platillo o bebida.
@@ -58,34 +59,20 @@ export function ProductFormSheet({ menu, product, defaultCategoryId, busy, error
       testID="product-form"
       title={editing ? 'Editar producto' : 'Nuevo producto'}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar'} onPress={save} disabled={busy} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar', onPress: save, disabled: busy }}
     >
       {message ? <Banner tone="error" message={message} /> : null}
 
       <TextField label="Nombre" value={name} onChangeText={setName} autoCapitalize="sentences" placeholder="Ej. Casado con pollo" />
 
-      <View style={styles.group}>
-        <Text variant="label" color="textSecondary">Tipo</Text>
-        <View style={styles.chips}>
-          {Object.values(PRODUCT_KIND).map((value) => (
-            <Chip key={value} label={PRODUCT_KIND_LABELS[value]} selected={kind === value} onPress={() => setKind(value)} />
-          ))}
-        </View>
-      </View>
+      <ChipField label="Tipo" options={KIND_OPTIONS} isSelected={(value) => kind === value} onSelect={setKind} />
 
-      <View style={styles.group}>
-        <Text variant="label" color="textSecondary">Categoría</Text>
-        <View style={styles.chips}>
-          {menu.categories.map((category) => (
-            <Chip
-              key={category.id}
-              label={category.active ? category.name : `${category.name} (oculta)`}
-              selected={categoryId === category.id}
-              onPress={() => setCategoryId(category.id)}
-            />
-          ))}
-        </View>
-      </View>
+      <ChipField
+        label="Categoría"
+        options={menu.categories.map((category) => ({ key: category.id, label: category.active ? category.name : `${category.name} (oculta)` }))}
+        isSelected={(id) => categoryId === id}
+        onSelect={setCategoryId}
+      />
 
       <TextField
         label="Precio (₡)"
@@ -95,23 +82,13 @@ export function ProductFormSheet({ menu, product, defaultCategoryId, busy, error
         placeholder="Ej. 3500"
       />
 
-      <View style={styles.group}>
-        <Text variant="label" color="textSecondary">Extras que se pueden agregar</Text>
-        {menu.extras.length === 0 ? (
-          <Text color="textSecondary">Todavía no hay extras. Créalos en la pestaña “Extras”.</Text>
-        ) : (
-          <View style={styles.chips}>
-            {menu.extras.map((extra) => (
-              <Chip
-                key={extra.id}
-                label={extra.active ? extra.name : `${extra.name} (oculto)`}
-                selected={extraIds.includes(extra.id)}
-                onPress={() => toggleExtra(extra.id)}
-              />
-            ))}
-          </View>
-        )}
-      </View>
+      <ChipField
+        label="Extras que se pueden agregar"
+        options={menu.extras.map((extra) => ({ key: extra.id, label: extra.active ? extra.name : `${extra.name} (oculto)` }))}
+        isSelected={(id) => extraIds.includes(id)}
+        onSelect={toggleExtra}
+        hint={menu.extras.length === 0 ? 'Todavía no hay extras. Créalos en la pestaña “Extras”.' : undefined}
+      />
 
       {editing ? (
         <>

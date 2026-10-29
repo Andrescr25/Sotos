@@ -10,5 +10,4 @@ export const styles = StyleSheet.create({
   initials: { fontWeight: theme.fontWeights.bold },
   identity: { flexShrink: 1, minWidth: 0, gap: theme.spacing.xs },
   name: { fontWeight: theme.fontWeights.bold },
-  pressed: { backgroundColor: theme.colors.border },
 });

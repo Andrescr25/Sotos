@@ -4,7 +4,7 @@ import { describeStock, toPortions } from '@/domain/inventory';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { styles } from '@/shared/styles/components/inventory';
 import { parseWholeNumber } from '@/shared/utils/numbers';
-import { Banner, Button, Chip, Sheet, Text, TextField } from '@/shared/ui';
+import { Banner, ChipField, Sheet, Text, TextField } from '@/shared/ui';
 
 const MODES = [
   { key: 'in', label: 'Entró mercadería', icon: 'add-circle-outline' },
@@ -60,18 +60,11 @@ export function StockAdjustSheet({ item, busy, error, onSave, onClose }) {
       testID="stock-adjust-form"
       title={`Ajustar ${item.name}`}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar ajuste'} onPress={save} disabled={!canSave} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar ajuste', onPress: save, disabled: !canSave }}
     >
       {message ? <Banner tone="error" message={message} /> : null}
 
-      <View style={styles.group}>
-        <View style={styles.chips}>
-          {MODES.map((option) => (
-            <Chip key={option.key} label={option.label} icon={option.icon} selected={mode === option.key} onPress={() => setMode(option.key)} />
-          ))}
-        </View>
-        <Text variant="caption" color="textSecondary">{HINTS[mode]}</Text>
-      </View>
+      <ChipField options={MODES} isSelected={(key) => mode === key} onSelect={setMode} hint={HINTS[mode]} />
 
       <View style={styles.pair}>
         <TextField

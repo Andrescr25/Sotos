@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { calculateItemTotal, createOrderItem } from '@/domain/orders';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/components/forms';
 import { formatColones } from '@/shared/utils/money';
-import { Button, Chip, Sheet, Stepper, Text, TextField } from '@/shared/ui';
+import { ChipField, Sheet, Stepper, Text, TextField } from '@/shared/ui';
 
 /**
  * Opciones de un producto antes de agregarlo: cantidad, extras (cada extra con
@@ -44,15 +45,9 @@ export function ProductOptionsSheet({ product, extras, quickNotes, onAdd, onClos
       visible
       title={product.name}
       onClose={onClose}
-      footer={
-        <Button
-          icon="add-circle"
-          label={`Agregar al pedido · ${formatColones(calculateItemTotal(item))}`}
-          onPress={() => onAdd(item)}
-        />
-      }
+      primaryAction={{ icon: 'add-circle', label: `Agregar al pedido · ${formatColones(calculateItemTotal(item))}`, onPress: () => onAdd(item) }}
     >
-      <View style={styles.row}>
+      <View style={commonStyles.rowBetween}>
         <Text variant="bodyLarge">Cantidad</Text>
         <Stepper value={quantity} min={1} onChange={setQuantity} />
       </View>
@@ -63,7 +58,7 @@ export function ProductOptionsSheet({ product, extras, quickNotes, onAdd, onClos
           {extras.map((extra) => {
             const value = Math.min(extraQuantities[extra.id] ?? 0, quantity);
             return (
-              <View key={extra.id} style={styles.row}>
+              <View key={extra.id} style={commonStyles.rowBetween}>
                 <View style={styles.optionInfo}>
                   <Text variant="bodyLarge">{extra.name}</Text>
                   <Text color="textSecondary">+{formatColones(extra.price)} c/u</Text>
@@ -87,11 +82,7 @@ export function ProductOptionsSheet({ product, extras, quickNotes, onAdd, onClos
 
       <View style={styles.section}>
         <Text variant="title">Observaciones</Text>
-        <View style={styles.chips}>
-          {quickNotes.map((note) => (
-            <Chip key={note} label={note} selected={quickSelected.includes(note)} onPress={() => toggleQuick(note)} />
-          ))}
-        </View>
+        <ChipField options={quickNotes.map((note) => ({ key: note, label: note }))} isSelected={(note) => quickSelected.includes(note)} onSelect={toggleQuick} />
         <TextField
           placeholder="Otra observación (ej. 1 sin cebolla)"
           value={custom}

@@ -5,10 +5,13 @@ import { OrderItemsList } from '@/features/orders/components/OrderItemsList';
 import { PaymentSummary } from '@/features/orders/components/PaymentSummary';
 import { receiptService } from '@/services/receiptService';
 import { getErrorMessage } from '@/shared/errors/messages';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/components/receipt';
 import { theme } from '@/shared/theme';
 import { formatColones } from '@/shared/utils/money';
-import { Banner, Button, Chip, Sheet, Text } from '@/shared/ui';
+import { Banner, ChipField, Sheet, Text } from '@/shared/ui';
+
+const PAPER_OPTIONS = theme.printing.paperWidths.map((width) => ({ key: width, label: `${width} mm` }));
 
 /** El pedido ya está guardado: imprimir es opcional y se puede reintentar. */
 export function ReceiptSheet({ order, onClose }) {
@@ -33,25 +36,21 @@ export function ReceiptSheet({ order, onClose }) {
   }
 
   return (
-    <Sheet visible title={`Comprobante ${formatOrderNumber(order.number)}`} onClose={onClose} footer={
-      <View style={styles.actions}>
-        <Button icon="print-outline" label={printing ? 'Abriendo impresión…' : 'Imprimir comprobante'} onPress={print} disabled={printing || !receiptService.supported} />
-        <Button variant="secondary" label="Seguir tomando pedidos" onPress={onClose} />
-      </View>
-    }>
+    <Sheet
+      visible
+      title={`Comprobante ${formatOrderNumber(order.number)}`}
+      onClose={onClose}
+      primaryAction={{ icon: 'print-outline', label: printing ? 'Abriendo impresión…' : 'Imprimir comprobante', onPress: print, disabled: printing || !receiptService.supported }}
+      secondaryAction={{ label: 'Seguir tomando pedidos', onPress: onClose }}
+    >
       <Banner tone="success" message={order.payment ? 'El pago quedó registrado y el pedido ya fue enviado a cocina. Puedes imprimir su comprobante o seguir atendiendo.' : 'El pedido ya fue enviado a cocina. Puedes imprimir su comprobante o seguir atendiendo.'} />
       <View style={styles.confirmation}>
-        <View style={styles.identity}><Text variant="title">{order.customerName}</Text><Text color="success">{formatOrderNumber(order.number)}</Text></View>
+        <View style={commonStyles.rowBetween}><Text variant="title">{order.customerName}</Text><Text color="success">{formatOrderNumber(order.number)}</Text></View>
         <OrderItemsList items={order.items} />
         <View style={styles.total}><Text variant="title">Total</Text><Text variant="title">{formatColones(order.totals.total)}</Text></View>
       </View>
       <PaymentSummary order={order} />
-      <View style={styles.group}>
-        <Text color="textSecondary">Ancho del papel</Text>
-        <View style={styles.chips}>
-          {theme.printing.paperWidths.map((width) => <Chip key={width} label={`${width} mm`} selected={paperWidth === width} onPress={() => setPaperWidth(width)} />)}
-        </View>
-      </View>
+      <ChipField label="Ancho del papel" options={PAPER_OPTIONS} isSelected={(width) => paperWidth === width} onSelect={setPaperWidth} />
       {error ? <Banner tone="error" message={error} /> : null}
       {opened ? <Banner tone="info" message="Se abrió la vista de impresión. Confirma la impresora y el papel; si cancelas, puedes intentarlo de nuevo." /> : null}
       <Text variant="caption" color="textSecondary">Usa la impresora configurada en Android. Si no aparece, activa su servicio de impresión en Ajustes de la tablet.</Text>

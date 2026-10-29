@@ -1,14 +1,8 @@
 import { View } from 'react-native';
-import { styles } from '@/shared/styles/screens/cashClosing';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { formatColones } from '@/shared/utils/money';
-import { Button, Text, TextField } from '@/shared/ui';
+import { Button, Callout, DataRow, Text, TextField } from '@/shared/ui';
 import { describeDifference } from '../cashDifference';
-
-const DIFFERENCE_STYLES = {
-  exact: styles.differenceExact,
-  over: styles.differenceOver,
-  short: styles.differenceShort,
-};
 
 /**
  * Cuadre del efectivo: el fondo con el que abrió la caja, lo cobrado en
@@ -43,7 +37,7 @@ export function CashCountCard({
   const summary = difference === null ? null : describeDifference(difference);
 
   return (
-    <View style={styles.card}>
+    <View style={commonStyles.panel}>
       <Text variant="title">Cuadre del efectivo</Text>
 
       <TextField
@@ -55,18 +49,12 @@ export function CashCountCard({
         error={expected === null ? 'Escribe el fondo en colones (0 si no hubo)' : undefined}
       />
 
-      <View style={styles.group}>
-        <View style={styles.row}>
-          <Text color="textSecondary">Cobrado en efectivo</Text>
-          <Text variant="label">{formatColones(cashSales)}</Text>
-        </View>
-        <View style={styles.row}>
-          <Text variant="bodyLarge">Efectivo esperado en caja</Text>
-          <Text variant="title">{expected === null ? '—' : formatColones(expected)}</Text>
-        </View>
+      <View style={commonStyles.group}>
+        <DataRow label="Cobrado en efectivo" value={formatColones(cashSales)} />
+        <DataRow strong label="Efectivo esperado en caja" value={expected === null ? '—' : formatColones(expected)} />
       </View>
 
-      <View style={styles.divider} />
+      <View style={commonStyles.divider} />
 
       <TextField
         label="Efectivo contado en caja *"
@@ -77,10 +65,7 @@ export function CashCountCard({
       />
 
       {summary ? (
-        <View style={[styles.difference, DIFFERENCE_STYLES[summary.kind]]} accessibilityLiveRegion="polite">
-          <Text variant="caption" color={summary.color}>{summary.caption}</Text>
-          <Text variant="headline" color={summary.color}>{summary.label}</Text>
-        </View>
+        <Callout live tone={summary.color} caption={summary.caption} value={summary.label} />
       ) : (
         <Text variant="caption" color="textSecondary">Escribe lo que contaste para ver si la caja cuadra.</Text>
       )}
@@ -93,7 +78,7 @@ export function CashCountCard({
         maxLength={200}
       />
 
-      <Button icon="lock-closed-outline" label="Cerrar caja" onPress={onClose} disabled={!canClose} style={styles.confirm} />
+      <Button icon="lock-closed-outline" label="Cerrar caja" onPress={onClose} disabled={!canClose} />
     </View>
   );
 }

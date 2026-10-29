@@ -489,8 +489,10 @@ márgenes ni tamaños de fuente sueltos.
 | Navegación y marco interior | `features/workspace/components/WorkspaceScreen.js` + `shared/styles/layout/workspace.js` |
 | Composición de cada pantalla | `shared/styles/screens/*` |
 | Umbrales responsive y anchos | `shared/theme/layout.js` + `shared/hooks/useResponsiveLayout.js` |
+| Cabecera de página y cómo se desplaza | `features/workspace/components/PageHeader.js` + `WorkspaceScreen.js` |
+| Fila de lista, dato/valor, cifra destacada, pestañas, columnas, pie de modal | `shared/ui/{ListRow,DataRow,Callout,Tabs,ChipRow,Columns,SheetActions}.js` |
 | CSS global del navegador | `shared/styles/web/global.css` |
-| Patrones repetidos (tarjeta, fila...) | `shared/styles/commonStyles.js` |
+| Patrones repetidos (tarjeta, panel, grupo, chips...) | `shared/styles/commonStyles.js` |
 | Librería de iconos | `shared/ui/Icon.js` |
 | Cuándo una tarjeta de cocina se pone ámbar/roja | `features/kitchen/config.js` |
 | Textos de error para el usuario | `shared/errors/messages.js` |
@@ -498,8 +500,16 @@ márgenes ni tamaños de fuente sueltos.
 La organización y las reglas de reutilización se detallan en
 [`src/shared/styles/README.md`](../src/shared/styles/README.md). El CSS global
 solo se carga en web; los estilos de React Native y los tokens se comparten
-entre web, iOS y Android. Las vistas consideran el ancho útil y el tamaño del
-texto para elegir columnas o una composición apilada.
+entre web, iOS y Android. Las vistas consideran el ancho útil, **la altura** y el
+tamaño del texto para elegir columnas o una composición apilada.
+
+**Responsive:** `useResponsiveLayout` distingue ancho (`mobile`, `sidebar`, `split`,
+`board`) y altura (`short`); `compact` = `mobile` o `short`. Con poco espacio
+vertical la cabecera de la página se desplaza con el contenido en vez de quedar
+fija, y los modales, avisos y chips cambian a versiones más densas. Las pantallas
+no hacen esto por su cuenta: lo resuelven los componentes compartidos (ver la
+tabla de `src/shared/styles/README.md`), de modo que un ajuste de diseño se hace
+en un solo lugar.
 
 ## 10. Cómo se agregan las funciones futuras
 

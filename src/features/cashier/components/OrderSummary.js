@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { calculateItemTotal, isValidCustomerName } from '@/domain/orders';
+import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
 import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/components/orderSummary';
 import { formatColones } from '@/shared/utils/money';
-import { Banner, Button, EmptyState, Icon, Stepper, Text, TextField } from '@/shared/ui';
+import { Banner, Button, EmptyState, IconButton, Stepper, Text, TextField } from '@/shared/ui';
 
 /**
  * Resumen del pedido en construcción: líneas con su cantidad, extras y
@@ -30,12 +31,19 @@ export function OrderSummary({
   onSend,
   scrollable = true,
 }) {
+  const { compact } = useResponsiveLayout();
   const Details = scrollable ? ScrollView : View;
   const empty = order.items.length === 0;
   const hasName = isValidCustomerName(order.customerName);
+  // Con poca altura el aviso es una línea de texto: el recuadro le quitaría espacio a las líneas del pedido.
+  const hint = empty
+    ? 'Agrega productos para poder enviar el pedido.'
+    : !hasName
+      ? 'Escribe el nombre del cliente para poder enviar el pedido.'
+      : null;
 
   return (
-    <View style={[commonStyles.card, styles.panel, scrollable && styles.fill]}>
+    <View style={[commonStyles.card, styles.panel, compact && styles.panelCompact, scrollable && styles.fill]}>
       <View style={commonStyles.rowBetween}>
         <Text variant="title">Pedido actual</Text>
         <Text color="textSecondary">{order.totals.itemCount} unidades</Text>
@@ -78,22 +86,8 @@ export function OrderSummary({
                 <View style={styles.lineActions}>
                   <Stepper value={item.quantity} min={0} onChange={(value) => onQuantity(item.id, value)} />
                   <View style={commonStyles.row}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Observaciones de ${item.name}`}
-                      onPress={() => onEditNotes(item.id)}
-                      style={styles.iconButton}
-                    >
-                      <Icon name="chatbubble-ellipses" color="textSecondary" />
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Quitar ${item.name}`}
-                      onPress={() => onRemove(item.id)}
-                      style={styles.iconButton}
-                    >
-                      <Icon name="trash" color="danger" />
-                    </Pressable>
+                    <IconButton icon="chatbubble-ellipses" size="md" label={`Observaciones de ${item.name}`} onPress={() => onEditNotes(item.id)} />
+                    <IconButton icon="trash" size="md" color="danger" label={`Quitar ${item.name}`} onPress={() => onRemove(item.id)} />
                   </View>
                 </View>
               </View>
@@ -117,9 +111,12 @@ export function OrderSummary({
         <Text variant="headline" color="primary">{formatColones(order.totals.total)}</Text>
       </View>
 
-      {empty ? <Banner tone="info" message="Agrega productos para poder enviar el pedido." /> : null}
-      {!empty && !hasName ? (
-        <Banner tone="warning" message="Escribe el nombre del cliente para poder enviar el pedido." />
+      {hint ? (
+        compact ? (
+          <Text variant="caption" color={empty ? 'textSecondary' : 'warning'}>{hint}</Text>
+        ) : (
+          <Banner tone={empty ? 'info' : 'warning'} message={hint} />
+        )
       ) : null}
 
       <Button

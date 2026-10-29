@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { View } from 'react-native';
 import { MENU_ICONS } from '@/domain/menu';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { styles } from '@/shared/styles/components/forms';
-import { Banner, Button, Chip, Sheet, Text, TextField, Toggle } from '@/shared/ui';
+import { Banner, ChipField, Sheet, TextField, Toggle } from '@/shared/ui';
+
 import { DeleteSection } from './DeleteSection';
+
+const ICON_OPTIONS = [
+  { key: null, label: 'Sin icono' },
+  ...MENU_ICONS.map((name) => ({ key: name, label: '', icon: name, style: styles.iconChip })),
+];
 
 /**
  * Crear o editar una categoría (Platillos, Bebidas, Postres…).
@@ -46,21 +51,13 @@ export function CategoryFormSheet({ category, productCount = 0, busy, error, onS
       testID="category-form"
       title={editing ? 'Editar categoría' : 'Nueva categoría'}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar'} onPress={save} disabled={busy} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar', onPress: save, disabled: busy }}
     >
       {message ? <Banner tone="error" message={message} /> : null}
 
       <TextField label="Nombre" value={name} onChangeText={setName} autoCapitalize="sentences" placeholder="Ej. Postres" />
 
-      <View style={styles.group}>
-        <Text variant="label" color="textSecondary">Icono</Text>
-        <View style={styles.chips}>
-          <Chip label="Sin icono" selected={icon === null} onPress={() => setIcon(null)} />
-          {MENU_ICONS.map((name_) => (
-            <Chip key={name_} label="" icon={name_} selected={icon === name_} onPress={() => setIcon(name_)} style={styles.iconChip} />
-          ))}
-        </View>
-      </View>
+      <ChipField label="Icono" options={ICON_OPTIONS} isSelected={(name) => icon === name} onSelect={setIcon} />
 
       {editing ? (
         <>

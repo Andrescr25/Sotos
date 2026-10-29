@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { pluralizeUnit, toPortions } from '@/domain/inventory';
 import { getErrorMessage } from '@/shared/errors/messages';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/components/inventory';
 import { parseWholeNumber } from '@/shared/utils/numbers';
-import { Banner, Button, Sheet, Text, TextField } from '@/shared/ui';
+import { Banner, Sheet, Text, TextField } from '@/shared/ui';
 import { DeleteSection } from './DeleteSection';
 
 const asText = (value) => (value === undefined || value === null ? '' : String(value));
@@ -74,14 +75,14 @@ export function InventoryItemFormSheet({ item, busy, error, onSave, onDelete, on
       testID="inventory-item-form"
       title={editing ? 'Editar insumo' : 'Nuevo insumo'}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar'} onPress={save} disabled={busy} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar', onPress: save, disabled: busy }}
     >
       {message ? <Banner tone="error" message={message} /> : null}
 
       <TextField label="Nombre" value={name} onChangeText={setName} autoCapitalize="sentences" placeholder="Ej. Papas congeladas" />
       <TextField label="Unidad (cómo lo compras o lo cuentas)" value={unit} onChangeText={setUnit} placeholder="Ej. paquete, kg, botella" />
 
-      <View style={styles.group}>
+      <View style={commonStyles.group}>
         <TextField
           label="¿Cuántas porciones rinde cada unidad?"
           value={perUnitText}
@@ -98,7 +99,7 @@ export function InventoryItemFormSheet({ item, busy, error, onSave, onDelete, on
       </View>
 
       {!editing ? (
-        <View style={styles.group}>
+        <View style={commonStyles.group}>
           <Text variant="label">Stock inicial</Text>
           <View style={styles.pair}>
             <TextField

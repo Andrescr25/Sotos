@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { PRODUCT_KIND_LABELS, isMenuEmpty } from '@/domain/menu';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { commonStyles } from '@/shared/styles/commonStyles';
 import { styles } from '@/shared/styles/screens/menu';
 import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
 import { formatColones } from '@/shared/utils/money';
-import { Banner, Button, Chip, Icon, Spinner, Text, TextField } from '@/shared/ui';
+import { Banner, Button, Chip, ChipRow, EmptyState, Spinner, Tabs, Text, TextField, Toolbar } from '@/shared/ui';
 import { CategoryFormSheet } from '../components/CategoryFormSheet';
 import { ExtraFormSheet } from '../components/ExtraFormSheet';
 import { MenuItemRow } from '../components/MenuItemRow';
@@ -76,22 +76,21 @@ export default function MenuScreen() {
   const error = admin.loadError ?? (sheet ? null : admin.actionError);
 
   return (
-    <WorkspaceScreen section="menu" title="Menú" subtitle="Lo que servimos, siempre a mano." back>
-      {error ? <Banner tone="error" message={getErrorMessage(error)} style={styles.banner} onDismiss={admin.clearError} /> : null}
+    <WorkspaceScreen section="menu" title="Menú" subtitle="Lo que servimos, siempre a mano." back scroll>
+      {error ? <Banner tone="error" message={getErrorMessage(error)} onDismiss={admin.clearError} /> : null}
 
       {admin.loading || !menu ? (
         <Spinner message="Cargando menú…" />
       ) : (
-        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        <>
           {isMenuEmpty(menu) ? (
-            <View style={[commonStyles.card, styles.empty]}>
-              <Icon name="restaurant" size="lg" color="primary" />
-              <Text variant="title">Tu menú está vacío</Text>
-              <Text color="textSecondary" style={styles.emptyText}>
-                Empieza creando una categoría y luego tus platillos y bebidas, o carga un menú de
-                ejemplo y edítalo a tu gusto.
-              </Text>
-              <View style={styles.emptyActions}>
+            <EmptyState
+              card
+              icon="restaurant-outline"
+              title="Tu menú está vacío"
+              message="Empieza creando una categoría y luego tus platillos y bebidas, o carga un menú de ejemplo y edítalo a tu gusto."
+            >
+              <View style={commonStyles.actionRow}>
                 <Button icon="add-circle" label="Crear mi primera categoría" onPress={() => { setTab('categories'); openSheet({ type: 'category' }); }} />
                 <Button
                   variant="secondary"
@@ -101,20 +100,16 @@ export default function MenuScreen() {
                   disabled={admin.busy}
                 />
               </View>
-            </View>
+            </EmptyState>
           ) : null}
 
-          <View style={styles.tabs}>
-            {TABS.map((item) => (
-              <Chip key={item.key} label={item.label} icon={item.icon} selected={tab === item.key} onPress={() => setTab(item.key)} />
-            ))}
-          </View>
+          <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
-          <View style={styles.list}>
+          <View style={commonStyles.section}>
             {tab === 'products' ? (
               <>
-                <View style={styles.toolbar}>
-                  <View style={styles.filters}>
+                <Toolbar>
+                  <ChipRow>
                     <Chip label="Todas" selected={categoryFilter === 'all'} onPress={() => setCategoryFilter('all')} />
                     {[...menu.categories].sort(bySortOrder).map((category) => (
                       <Chip
@@ -124,7 +119,7 @@ export default function MenuScreen() {
                         onPress={() => setCategoryFilter(category.id)}
                       />
                     ))}
-                  </View>
+                  </ChipRow>
                   <Button
                     icon="add-circle"
                     label="Nuevo producto"
@@ -133,7 +128,7 @@ export default function MenuScreen() {
                       openSheet({ type: 'product', defaultCategoryId: categoryFilter === 'all' ? null : categoryFilter })
                     }
                   />
-                </View>
+                </Toolbar>
 
                 {menu.categories.length === 0 ? (
                   <Banner tone="info" message="Primero crea una categoría en la pestaña “Categorías”." />
@@ -169,12 +164,9 @@ export default function MenuScreen() {
 
             {tab === 'extras' ? (
               <>
-                <View style={styles.toolbar}>
-                  <Text color="textSecondary" style={styles.hint}>
-                    Los extras se asignan a cada producto al crearlo o editarlo.
-                  </Text>
+                <Toolbar hint="Los extras se asignan a cada producto al crearlo o editarlo.">
                   <Button icon="add-circle" label="Nuevo extra" onPress={() => openSheet({ type: 'extra' })} />
-                </View>
+                </Toolbar>
                 {menu.extras.length === 0 ? <Text color="textSecondary">Todavía no hay extras.</Text> : null}
                 {[...menu.extras].sort(bySortOrder).map((extra) => (
                   <MenuItemRow
@@ -201,12 +193,9 @@ export default function MenuScreen() {
 
             {tab === 'categories' ? (
               <>
-                <View style={styles.toolbar}>
-                  <Text color="textSecondary" style={styles.hint}>
-                    Las categorías son los botones que ve el cajero para encontrar los productos.
-                  </Text>
+                <Toolbar hint="Las categorías son los botones que ve el cajero para encontrar los productos.">
                   <Button icon="add-circle" label="Nueva categoría" onPress={() => openSheet({ type: 'category' })} />
-                </View>
+                </Toolbar>
                 {menu.categories.length === 0 ? <Text color="textSecondary">Todavía no hay categorías.</Text> : null}
                 {[...menu.categories].sort(bySortOrder).map((category) => {
                   const count = productCountByCategory.get(category.id) ?? 0;
@@ -263,7 +252,7 @@ export default function MenuScreen() {
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </>
       )}
 
       {sheet?.type === 'product' && menu ? (

@@ -7,15 +7,17 @@ import {
   calculateChange,
   suggestTenderedAmounts,
 } from '@/domain/payments';
-import { styles } from '@/shared/styles/components/payment';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { formatColones, parseColones } from '@/shared/utils/money';
-import { Banner, Button, Chip, Sheet, Text, TextField } from '@/shared/ui';
+import { Banner, Callout, Chip, ChipField, Sheet, Text, TextField } from '@/shared/ui';
 
 const METHOD_ICONS = {
   [PAYMENT_METHOD.CASH]: 'cash-outline',
   [PAYMENT_METHOD.CARD]: 'card-outline',
   [PAYMENT_METHOD.SINPE]: 'phone-portrait-outline',
 };
+
+const METHOD_OPTIONS = PAYMENT_METHODS.map((key) => ({ key, label: PAYMENT_METHOD_LABELS[key], icon: METHOD_ICONS[key] }));
 
 /**
  * Cobro del pedido, antes de enviarlo a cocina. El pedido solo sale cuando
@@ -50,43 +52,15 @@ export function PaymentSheet({ order, busy, error, onConfirm, onClose }) {
       testID="payment-sheet"
       title="Cobrar pedido"
       onClose={busy ? () => {} : onClose}
-      footer={
-        <View style={styles.actions}>
-          <Button
-            icon="checkmark-circle"
-            label={busy ? 'Enviando…' : 'Confirmar pago y enviar a cocina'}
-            onPress={confirm}
-            disabled={!canConfirm}
-            style={styles.confirm}
-          />
-          <Button variant="secondary" label="Volver al pedido" onPress={onClose} disabled={busy} />
-        </View>
-      }
+      primaryAction={{ icon: 'checkmark-circle', label: busy ? 'Enviando…' : 'Confirmar pago y enviar a cocina', onPress: confirm, disabled: !canConfirm }}
+      secondaryAction={{ label: 'Volver al pedido', onPress: onClose, disabled: busy }}
     >
-      <View style={styles.totalCard}>
-        <Text color="textSecondary">{`Pedido de ${order.customerName}`}</Text>
-        <Text variant="caption" color="textSecondary">Total a cobrar</Text>
-        <Text variant="display" color="primary">{formatColones(total)}</Text>
-      </View>
+      <Callout size="display" title={`Pedido de ${order.customerName}`} caption="Total a cobrar" value={formatColones(total)} />
 
-      <View style={styles.group}>
-        <Text variant="label">¿Cómo paga el cliente?</Text>
-        <View style={styles.chips}>
-          {PAYMENT_METHODS.map((option) => (
-            <Chip
-              key={option}
-              label={PAYMENT_METHOD_LABELS[option]}
-              icon={METHOD_ICONS[option]}
-              selected={method === option}
-              disabled={busy}
-              onPress={() => setMethod(option)}
-            />
-          ))}
-        </View>
-      </View>
+      <ChipField label="¿Cómo paga el cliente?" options={METHOD_OPTIONS} isSelected={(key) => method === key} onSelect={setMethod} disabled={busy} />
 
       {isCash ? (
-        <View style={styles.group}>
+        <View style={commonStyles.group}>
           <TextField
             label="¿Con cuánto paga el cliente?"
             value={tenderedText}
@@ -95,7 +69,7 @@ export function PaymentSheet({ order, busy, error, onConfirm, onClose }) {
             placeholder="Ej. 10000"
             editable={!busy}
           />
-          <View style={styles.chips}>
+          <View style={commonStyles.chips}>
             <Chip label="Exacto" selected={tendered === total} disabled={busy} onPress={() => setTenderedText(String(total))} />
             {suggestTenderedAmounts(total).map((amount) => (
               <Chip
@@ -111,15 +85,9 @@ export function PaymentSheet({ order, busy, error, onConfirm, onClose }) {
           {change === null ? (
             <Text variant="caption" color="textSecondary">Escribe o elige cuánto entregó el cliente para calcular el vuelto.</Text>
           ) : change < 0 ? (
-            <View style={[styles.result, styles.resultShort]} accessibilityLiveRegion="polite">
-              <Text variant="caption" color="danger">Falta para completar el total</Text>
-              <Text variant="headline" color="danger">{formatColones(-change)}</Text>
-            </View>
+            <Callout live tone="danger" caption="Falta para completar el total" value={formatColones(-change)} />
           ) : (
-            <View style={[styles.result, styles.resultChange]} accessibilityLiveRegion="polite">
-              <Text variant="caption" color="success">{change === 0 ? 'Pago exacto' : 'Vuelto para el cliente'}</Text>
-              <Text variant="headline" color="success">{formatColones(change)}</Text>
-            </View>
+            <Callout live tone="success" caption={change === 0 ? 'Pago exacto' : 'Vuelto para el cliente'} value={formatColones(change)} />
           )}
         </View>
       ) : null}

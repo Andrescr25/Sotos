@@ -5,8 +5,9 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { SessionBar } from '@/features/auth/components/SessionBar';
 import { useResponsiveLayout } from '@/shared/hooks/useResponsiveLayout';
 import { workspaceStyles as styles } from '@/shared/styles/layout/workspace';
-import { Button, Icon, Screen, Text } from '@/shared/ui';
+import { Icon, Screen, Text } from '@/shared/ui';
 import { BrandLogo } from '@/shared/ui/BrandLogo';
+import { PageHeader } from './PageHeader';
 
 const NAVIGATION = [
   { key: 'admin', label: 'Resumen', icon: 'grid-outline', route: '/admin', area: AREAS.ADMIN },
@@ -18,12 +19,34 @@ const NAVIGATION = [
   { key: 'kitchen', label: 'Cocina', icon: 'flame-outline', route: '/cocina', area: AREAS.KITCHEN },
 ];
 
-/** Marco compartido: identidad, navegación autorizada y espacio de trabajo adaptable. */
-export function WorkspaceScreen({ section, title, subtitle, actions, back = false, scroll = false, children }) {
+/**
+ * Marco compartido: identidad, navegación autorizada y espacio de trabajo adaptable.
+ *
+ * - `scroll`: toda la página se desplaza como una sola (listas, formularios,
+ *   resúmenes). Sin `scroll`, el contenido llena la altura y cada panel se
+ *   desplaza por dentro (Caja y cocina en pantallas anchas).
+ * - Con `scroll` y poco espacio vertical (teléfono, poca altura) la cabecera
+ *   —"Volver", título y acciones— se desplaza junto con el contenido en vez de
+ *   quedarse fija y robarle la mitad de la pantalla.
+ * - `scrollRef` permite a la pantalla desplazarse a un punto (p. ej. "Ver pedido").
+ *
+ * Los avisos y paneles que se pasen como hijos quedan separados por el mismo
+ * espacio: no hace falta darles margen.
+ */
+export function WorkspaceScreen({ section, title, subtitle, actions, back = false, scroll = false, scrollRef, children }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { sidebar, mobile, padding } = useResponsiveLayout();
+  const { sidebar, mobile, compact, short, padding } = useResponsiveLayout();
   const links = NAVIGATION.filter((item) => canAccessArea(user, item.area));
+  const header = (
+    <PageHeader
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
+      onBack={back ? () => (router.canGoBack() ? router.back() : router.replace('/admin')) : undefined}
+    />
+  );
+  const headerScrolls = scroll && compact;
 
   function navigation(item, horizontal = false) {
     const selected = item.key === section;
@@ -58,11 +81,14 @@ export function WorkspaceScreen({ section, title, subtitle, actions, back = fals
               <Text color="brandOnRedMuted" style={styles.sidebarCaption}>EL ESPACIO DEL EQUIPO</Text>
             </View>
             <View style={styles.sidebarLinks}>{links.map((item) => navigation(item))}</View>
-            <View style={styles.sidebarFooter}>
-              <Icon name="restaurant-outline" color="brandCream" />
-              <Text color="brandCream" style={styles.sidebarMotto}>{'Buen equipo.\nBuen servicio.'}</Text>
-              <Text variant="caption" color="brandOnRedMuted">Cada pedido cuenta.</Text>
-            </View>
+            {/* Decorativo: con poca altura se omite para que la navegación no se salga de la pantalla. */}
+            {!short ? (
+              <View style={styles.sidebarFooter}>
+                <Icon name="restaurant-outline" color="brandCream" />
+                <Text color="brandCream" style={styles.sidebarMotto}>{'Buen equipo.\nBuen servicio.'}</Text>
+                <Text variant="caption" color="brandOnRedMuted">Cada pedido cuenta.</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.workspace}>
@@ -84,19 +110,13 @@ export function WorkspaceScreen({ section, title, subtitle, actions, back = fals
             </ScrollView>
           ) : null}
           <View style={[styles.content, { padding }]}>
-            {back ? <Button compact variant="secondary" icon="arrow-back" label="Volver" onPress={() => router.canGoBack() ? router.back() : router.replace('/admin')} style={styles.back} /> : null}
-            <View style={styles.pageHeader}>
-              <View style={styles.headingCopy}>
-                <Text variant="headline" accessibilityRole="header" style={[styles.title, mobile && styles.titleMobile]}>{title}</Text>
-                {subtitle ? <Text color="textSecondary" style={styles.subtitle}>{subtitle}</Text> : null}
-              </View>
-              {actions ? <View style={styles.actions}>{actions}</View> : null}
-            </View>
+            {headerScrolls ? null : header}
             {scroll ? (
-              <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                {headerScrolls ? header : null}
                 {children}
               </ScrollView>
-            ) : <View style={styles.body}>{children}</View>}
+            ) : <View style={[styles.body, styles.bodyFill]}>{children}</View>}
           </View>
         </KeyboardAvoidingView>
       </View>

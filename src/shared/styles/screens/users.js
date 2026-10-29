@@ -2,8 +2,6 @@ import { StyleSheet } from 'react-native';
 import { theme } from '@/shared/theme';
 import { commonStyles } from '@/shared/styles/commonStyles';
 export const styles = StyleSheet.create({
-  banner: commonStyles.banner,
-  list: commonStyles.list,
   row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: theme.spacing.xl, padding: theme.spacing.xl },
   pending: { borderColor: theme.colors.warning, backgroundColor: theme.colors.warningSoft },
   disabled: { opacity: 0.65 },

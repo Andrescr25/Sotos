@@ -51,7 +51,7 @@ export function InviteLinkSheet({ user, invitation, onClose }) {
       testID="invite-link"
       title={isReset ? `Contraseña nueva para ${user.name}` : `Enlace para ${user.name}`}
       onClose={onClose}
-      footer={<Button variant="secondary" label="Listo" onPress={onClose} />}
+      primaryAction={{ variant: 'secondary', label: 'Listo', onPress: onClose }}
     >
       <Banner
         tone="success"
@@ -62,7 +62,7 @@ export function InviteLinkSheet({ user, invitation, onClose }) {
         }
       />
 
-      <View style={styles.linkGroup}>
+      <View style={styles.section}>
         <TextField label="Enlace" value={url} editable={false} selectTextOnFocus multiline />
         <Button
           icon={copied ? 'checkmark' : 'copy'}

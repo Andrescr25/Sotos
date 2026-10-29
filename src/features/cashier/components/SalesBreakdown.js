@@ -1,9 +1,9 @@
 import { View } from 'react-native';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/domain/payments';
-import { styles } from '@/shared/styles/screens/cashClosing';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { formatColones } from '@/shared/utils/money';
 import { formatDateTime } from '@/shared/utils/time';
-import { Banner, Text } from '@/shared/ui';
+import { Banner, DataRow, Text } from '@/shared/ui';
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
@@ -18,24 +18,25 @@ export function SalesBreakdown({ sales, since }) {
   const { cancelled } = sales;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.group}>
+    <View style={commonStyles.panel}>
+      <View style={commonStyles.group}>
         <Text variant="title">Ventas por cerrar</Text>
         {since ? <Text variant="caption" color="textSecondary">{`Desde ${formatDateTime(since)}`}</Text> : null}
       </View>
 
-      <View style={styles.row}>
+      <View style={commonStyles.rowBetween}>
         <Text color="textSecondary">{plural(sales.orderCount, 'pedido cobrado', 'pedidos cobrados')}</Text>
         <Text variant="headline" color="primary">{formatColones(sales.total)}</Text>
       </View>
 
-      <View style={styles.divider} />
+      <View style={commonStyles.divider} />
 
       {PAYMENT_METHODS.map((method) => (
-        <View key={method} style={styles.row}>
-          <Text>{PAYMENT_METHOD_LABELS[method]}</Text>
-          <Text variant="label">{`${plural(sales.byMethod[method].count, 'pedido', 'pedidos')} · ${formatColones(sales.byMethod[method].total)}`}</Text>
-        </View>
+        <DataRow
+          key={method}
+          label={PAYMENT_METHOD_LABELS[method]}
+          value={`${plural(sales.byMethod[method].count, 'pedido', 'pedidos')} · ${formatColones(sales.byMethod[method].total)}`}
+        />
       ))}
 
       {cancelled.count > 0 ? (

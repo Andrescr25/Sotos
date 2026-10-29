@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { RECIPE_KIND, STOCK_STATUS, getStockStatus } from '@/domain/inventory';
 import { PRODUCT_KIND_LABELS } from '@/domain/menu';
 import { useMenu } from '@/features/menu/useMenu';
 import { WorkspaceScreen } from '@/features/workspace/components/WorkspaceScreen';
+import { commonStyles } from '@/shared/styles/commonStyles';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { styles } from '@/shared/styles/screens/inventory';
-import { Banner, Button, Chip, Icon, Spinner, Text } from '@/shared/ui';
+import { Banner, Button, EmptyState, Spinner, Tabs, Text, Toolbar } from '@/shared/ui';
 import { InventoryItemFormSheet } from '../components/InventoryItemFormSheet';
 import { InventoryItemRow } from '../components/InventoryItemRow';
 import { RecipeRow } from '../components/RecipeRow';
@@ -67,40 +68,32 @@ export default function InventoryScreen() {
   const recipeLines = (kind, id) => inventory?.recipes[kind][id] ?? [];
 
   return (
-    <WorkspaceScreen section="inventory" title="Inventario" subtitle="Cuánto queda de cada insumo y cuánto gasta cada platillo." back scroll={false}>
-      {error ? <Banner tone="error" message={getErrorMessage(error)} style={styles.banner} onDismiss={admin.clearError} /> : null}
+    <WorkspaceScreen section="inventory" title="Inventario" subtitle="Cuánto queda de cada insumo y cuánto gasta cada platillo." back scroll>
+      {error ? <Banner tone="error" message={getErrorMessage(error)} onDismiss={admin.clearError} /> : null}
 
       {admin.loading || !inventory ? (
         <Spinner message="Cargando inventario…" />
       ) : (
-        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        <>
           {items.length === 0 ? (
-            <View style={styles.empty}>
-              <Icon name="cube-outline" size="lg" color="primary" />
-              <Text variant="title">Todavía no hay insumos</Text>
-              <Text color="textSecondary" style={styles.emptyText}>
-                Un insumo es lo que compras, por ejemplo un paquete de papas. Dices cuántas porciones rinde (8, por
-                ejemplo) y en la receta de cada platillo cuántas usa: cada venta rebaja esas porciones sola.
-              </Text>
+            <EmptyState
+              card
+              icon="cube-outline"
+              title="Todavía no hay insumos"
+              message="Un insumo es lo que compras, por ejemplo un paquete de papas. Dices cuántas porciones rinde (8, por ejemplo) y en la receta de cada platillo cuántas usa: cada venta rebaja esas porciones sola."
+            >
               <Button icon="add-circle" label="Crear mi primer insumo" onPress={() => { setTab('items'); openSheet({ type: 'item' }); }} />
-            </View>
+            </EmptyState>
           ) : null}
 
-          <View style={styles.tabs}>
-            {TABS.map((item) => (
-              <Chip key={item.key} label={item.label} icon={item.icon} selected={tab === item.key} onPress={() => setTab(item.key)} />
-            ))}
-          </View>
+          <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
-          <View style={styles.list}>
+          <View style={commonStyles.section}>
             {tab === 'items' ? (
               <>
-                <View style={styles.toolbar}>
-                  <Text color="textSecondary" style={styles.hint}>
-                    El stock se actualiza solo con cada venta. Ajústalo cuando compres, haya merma o hagas un conteo.
-                  </Text>
+                <Toolbar hint="El stock se actualiza solo con cada venta. Ajústalo cuando compres, haya merma o hagas un conteo.">
                   <Button icon="add-circle" label="Nuevo insumo" onPress={() => openSheet({ type: 'item' })} />
-                </View>
+                </Toolbar>
 
                 {toRestock > 0 ? (
                   <Banner tone="warning" message={`${toRestock} ${toRestock === 1 ? 'insumo está agotado o por reponer' : 'insumos están agotados o por reponer'}.`} />
@@ -157,7 +150,7 @@ export default function InventoryScreen() {
               </>
             ) : null}
           </View>
-        </ScrollView>
+        </>
       )}
 
       {sheet?.type === 'item' ? (

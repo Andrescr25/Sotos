@@ -1,7 +1,6 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { styles } from '@/shared/styles/components/sessionBar';
-import { commonStyles } from '@/shared/styles/commonStyles';
-import { Icon, Text } from '@/shared/ui';
+import { IconButton, Text } from '@/shared/ui';
 import { useAuth } from '../AuthProvider';
 
 /** Identidad de la sesión, compartida por todos los espacios de trabajo. */
@@ -17,9 +16,7 @@ export function SessionBar({ compact = false }) {
         <Text variant="caption" numberOfLines={1} style={styles.name}>{user.name}</Text>
         {!compact ? <Text variant="caption" color="textSecondary">@{user.username}</Text> : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Salir" onPress={logout} style={({ pressed }) => [commonStyles.iconButton, pressed && styles.pressed]}>
-        <Icon name="log-out-outline" size="sm" color="textSecondary" />
-      </Pressable>
+      <IconButton icon="log-out-outline" label="Salir" onPress={logout} />
     </View>
   );
 }

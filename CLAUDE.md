@@ -53,6 +53,14 @@ Arquitectura completa en `docs/ARQUITECTURA.md`; despliegue en `docs/DESPLIEGUE_
 - Al cambiar una contraseña se cierran las conexiones en vivo de la cuenta (`hub.disconnectUser`); el cliente solo expira su sesión si el token rechazado es el vigente (`createRealtimeClient`).
 - `users.password_hash` es NULL-able: cualquier consulta debe tratarlo como "cuenta invitada".
 
+## Diseño y responsive
+
+- **Reutiliza antes de escribir estilos:** `ListRow`, `DataRow`, `Callout`, `IconButton`, `Tabs`, `ChipRow`, `Toolbar`, `Columns`/`Column`, `EmptyState` y `Sheet` (con `primaryAction`/`secondaryAction`) son la fuente única; la tabla está en `src/shared/styles/README.md`. Si un patrón aparece en dos pantallas, va a `shared/ui`, no se copia.
+- **Pantallas con `WorkspaceScreen`:** páginas de lista o formulario usan `scroll` y **no traen su propio `ScrollView`**; los avisos y bloques hijos no llevan `margin` (el marco los separa). Paneles con desplazamiento propio usan `scroll={false}` + `Columns fill`.
+- **Tamaño de pantalla:** usa `useResponsiveLayout` (`mobile`, `short`, `compact`, `split`, `board`); no leas `useWindowDimensions` ni inventes umbrales: van en `shared/theme/layout.js`. `computeLayout` es la función pura y tiene pruebas. Con `compact` falta altura: la cabecera se desplaza, el pie de los modales va en fila, las tiras de chips se deslizan.
+- Estilos de grupos, chips, filas y tarjetas: `commonStyles` (`group`, `chips`, `rowBetween`, `card`, `panel`, `section`). Un archivo de `shared/styles` solo guarda lo propio de su pantalla o componente; no reexporta `commonStyles` ni importa `commonStyles as styles`.
+- Todo botón de solo icono es un `IconButton` con nombre accesible obligatorio.
+
 ## Cobro antes de cocina y cierre de caja
 
 - **Un pedido no sale a cocina sin pago.** `Order.payment` (forma, monto, recibido, vuelto, `paidAt`, `receivedBy`) es obligatorio para pasar de borrador a "nuevo". Se exige en tres capas, igual que el nombre: `changeOrderStatus` (dominio), `checkOrderWrite` + `checkOrderActor` (servidor y memoria; el pago debe estar firmado por la sesión) y el modal de cobro de Caja.

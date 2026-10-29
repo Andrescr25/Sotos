@@ -1,6 +1,8 @@
 /** Umbrales sobre el espacio útil, ajustados también al tamaño del texto. */
 export const layout = {
   mobileBreakpoint: 600,
+  /** Debajo de esta altura útil (px) la interfaz se compacta: cabecera que se desplaza, modales más densos. */
+  shortHeight: 640,
   sidebarBreakpoint: 1180,
   splitBreakpoint: 960,
   boardBreakpoint: 1000,

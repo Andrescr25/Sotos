@@ -270,7 +270,6 @@ describe('flujo caja → cocina → entrega', () => {
   });
 });
 
-
 describe('cobro y envío a cocina', () => {
   it('si falla el envío, el error sale dentro del cobro y el borrador se conserva para reintentar', async () => {
     await signInAs('cajero', 'cajero123');
@@ -339,7 +338,7 @@ describe('cierre de caja', () => {
     expect(await screen.findByText(/Caja cerrada\. Cierre #1/)).toBeTruthy();
     expect(await screen.findByText('No hay ventas por cerrar')).toBeTruthy();
     expect(screen.getByText('Cierre #1')).toBeTruthy(); // aparece en el historial
-    expect(screen.getByText('Cuadró')).toBeTruthy();
+    expect(screen.getByText('Efectivo contado ₡8.500 · Cuadró')).toBeTruthy();
     await authService.logout();
   });
 

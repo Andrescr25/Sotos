@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { View } from 'react-native';
 import { ASSIGNABLE_ROLES, ROLE_LABELS, suggestUsername } from '@/domain/users';
 import { getErrorMessage } from '@/shared/errors/messages';
-import { commonStyles as styles } from '@/shared/styles/commonStyles';
-import { Banner, Button, Chip, Sheet, Text, TextField } from '@/shared/ui';
+import { Banner, ChipField, Sheet, Text, TextField } from '@/shared/ui';
+
+const ROLE_OPTIONS = [
+  ...ASSIGNABLE_ROLES.map((value) => ({ key: value, label: ROLE_LABELS[value] })),
+  { key: null, label: 'Sin acceso todavía' },
+];
 
 /**
  * El administrador crea la cuenta de un empleado. No se escribe contraseña:
@@ -42,14 +45,7 @@ export function InviteFormSheet({ busy, onSubmit, onClose }) {
       testID="invite-form"
       title="Invitar a un empleado"
       onClose={onClose}
-      footer={
-        <Button
-          icon="link"
-          label={busy ? 'Creando…' : 'Crear cuenta y generar enlace'}
-          onPress={submit}
-          disabled={busy}
-        />
-      }
+      primaryAction={{ icon: 'link', label: busy ? 'Creando…' : 'Crear cuenta y generar enlace', onPress: submit, disabled: busy }}
     >
       {error ? <Banner tone="error" message={error} /> : null}
 
@@ -75,15 +71,7 @@ export function InviteFormSheet({ busy, onSubmit, onClose }) {
         placeholder="Ej. maria.perez"
       />
 
-      <View style={styles.group}>
-        <Text variant="label" color="textSecondary">Acceso</Text>
-        <View style={styles.chips}>
-          {ASSIGNABLE_ROLES.map((value) => (
-            <Chip key={value} label={ROLE_LABELS[value]} selected={role === value} onPress={() => setRole(value)} />
-          ))}
-          <Chip label="Sin acceso todavía" selected={role === null} onPress={() => setRole(null)} />
-        </View>
-      </View>
+      <ChipField label="Acceso" options={ROLE_OPTIONS} isSelected={(value) => role === value} onSelect={setRole} />
     </Sheet>
   );
 }

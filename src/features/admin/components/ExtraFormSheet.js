@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getErrorMessage } from '@/shared/errors/messages';
 import { parseColones } from '@/shared/utils/money';
-import { Banner, Button, Sheet, TextField, Toggle } from '@/shared/ui';
+import { Banner, Sheet, TextField, Toggle } from '@/shared/ui';
 import { DeleteSection } from './DeleteSection';
 
 /**
@@ -46,7 +46,7 @@ export function ExtraFormSheet({ extra, busy, error, onSave, onDelete, onClose }
       testID="extra-form"
       title={editing ? 'Editar extra' : 'Nuevo extra'}
       onClose={onClose}
-      footer={<Button icon="checkmark" label={busy ? 'Guardando…' : 'Guardar'} onPress={save} disabled={busy} />}
+      primaryAction={{ icon: 'checkmark', label: busy ? 'Guardando…' : 'Guardar', onPress: save, disabled: busy }}
     >
       {message ? <Banner tone="error" message={message} /> : null}
 
